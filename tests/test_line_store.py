@@ -84,3 +84,99 @@ def test_feedback_recorded_on_alert(store, schema):
     assert store.record_feedback(999999, "weed", uid, datetime.now(tz=UTC)) == "not_found"
     names = store.plot_names(uid)
     assert len(names) == 1 and names[0].startswith("ไร่หลังบ้าน (ประมาณ ")
+
+
+def _reg(uid, **kw):
+    import math
+
+    from shapely.geometry import Polygon
+
+    lon, lat, side = 102.55, 16.45, 200
+    dlat = side / 111_320.0
+    dlon = side / (111_320.0 * math.cos(math.radians(lat)))
+    reg = {
+        "line_user_id": uid,
+        "display_name": "พี่หน่อย",
+        "name": "ไร่หลังบ้าน",
+        "polygon": Polygon(
+            [(lon, lat), (lon + dlon, lat), (lon + dlon, lat + dlat), (lon, lat + dlat)]
+        ),
+        "area_rai": 25.0,
+        "cane_type": "ratoon",
+        "planting_date": None,
+        "last_harvest_date": date(2026, 2, 1),
+        "on_behalf": False,
+        "member_name": None,
+        "member_phone": None,
+        "consents": {"service": True, "leader_view": True, "research": False},
+        "consent_version": "test",
+    }
+    reg.update(kw)
+    return reg
+
+
+def test_create_and_list_plots_self_and_on_behalf(schema):
+    store = PgStore(
+        os.environ["DATABASE_URL"],
+        connect_kwargs={"options": f"-c search_path={schema},public"},
+        phone_key="test-key",
+    )
+    uid = "U" + uuid.uuid4().hex
+    own = store.create_plot(_reg(uid))
+    assert own["owner"] == "self" and own["area_rai"] == 25.0
+    member = store.create_plot(
+        _reg(
+            uid,
+            name="ไร่นางบุญมี",
+            on_behalf=True,
+            member_name="นางบุญมี",
+            member_phone="0812345678",
+            consents={"service": True},
+        )
+    )
+    assert member["owner"] == "member" and member["phone_stored"]
+
+    plots = store.list_plots(uid)
+    assert [p["name"] for p in plots] == ["ไร่นางบุญมี", "ไร่หลังบ้าน"]
+    assert plots[0]["owner_name"] == "นางบุญมี" and plots[1]["owner_name"] is None
+    assert plots[1]["geometry"]["type"] == "MultiPolygon"
+    assert plots[1]["last_harvest_date"] == "2026-02-01"
+    assert store.plot_names(uid)[1].endswith("— ของนางบุญมี")
+
+    rows = _q(
+        schema,
+        "SELECT u.display_name, pgp_sym_decrypt(u.phone_enc, 'test-key') AS phone,"
+        " p.registered_by, p.source, me.line_user_id AS registrar"
+        " FROM plots p JOIN users u ON u.id = p.owner_user_id"
+        " JOIN users me ON me.id = p.registered_by"
+        " WHERE p.id = %s",
+        (member["id"],),
+    )[0]
+    assert rows["phone"] == "0812345678" and rows["source"] == "liff" and rows["registrar"] == uid
+    consents = _q(
+        schema,
+        "SELECT purpose, granted, method, assisted_by FROM consents WHERE plot_id = %s"
+        " ORDER BY purpose",
+        (member["id"],),
+    )
+    assert {c["purpose"]: c["granted"] for c in consents} == {
+        "leader_view": False,
+        "research": False,
+        "service": True,
+    }
+    assert all(c["method"] == "assisted_pending" and c["assisted_by"] for c in consents)
+
+
+def test_create_plot_without_phone_key_does_not_store_phone(schema):
+    store = PgStore(
+        os.environ["DATABASE_URL"], connect_kwargs={"options": f"-c search_path={schema},public"}
+    )
+    out = store.create_plot(
+        _reg(
+            "U" + uuid.uuid4().hex,
+            on_behalf=True,
+            member_name="นายสมัย",
+            member_phone="0812345678",
+        )
+    )
+    assert out["phone_stored"] is False

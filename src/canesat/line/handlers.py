@@ -68,9 +68,12 @@ def _short(uid: str | None) -> str:
 
 
 class EventRouter:
-    def __init__(self, line: LineApi, store: Store | None = None) -> None:
+    def __init__(
+        self, line: LineApi, store: Store | None = None, liff_url: str | None = None
+    ) -> None:
         self.line = line
         self.store: Store = store or NullStore()
+        self.liff_url = liff_url
         self._handlers: list[tuple[type, Callable[[Any], Replies | None]]] = [
             (FollowEvent, self.on_follow),
             (UnfollowEvent, self.on_unfollow),
@@ -116,17 +119,20 @@ class EventRouter:
     def on_message(self, event: MessageEvent) -> Replies:
         if not isinstance(event.message, TextMessageContent):
             return m.non_text_received()
+        if event.message.text.strip().startswith(m.REGISTERED_PREFIX):
+            log.info("text user=%s intent=registered_ack", _short(_user_id(event)))
+            return m.registered_ack()
         intent = match_keyword(event.message.text)
         log.info("text user=%s intent=%s", _short(_user_id(event)), intent)
         if intent == "help":
             return m.help_menu()
         if intent == "my_plots":
             uid = _user_id(event)
-            return m.my_plots(self.store.plot_names(uid) if uid else None)
+            return m.my_plots(self.store.plot_names(uid) if uid else None, self.liff_url)
         if intent == "compare":
             return m.compare_neighbours()
         if intent == "add_plot":
-            return m.add_plot()
+            return m.add_plot(self.liff_url)
         if intent == "leader":
             return m.group_leader()
         if intent == "rain":

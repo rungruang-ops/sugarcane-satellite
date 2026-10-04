@@ -9,14 +9,19 @@ JSON secrets file without printing them.
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
 from linebot.v3 import WebhookParser
 from linebot.v3.exceptions import InvalidSignatureError
 
 from .client import LineApi, LineClient
 from .config import LineSettings
 from .handlers import EventRouter
+from .idtoken import IdTokenVerifier, LineIdTokenVerifier
+from .ingest_queue import IngestQueue, ingest_plot
+from .liff_app import STATIC_DIR, build_liff_router
 from .store import NullStore, PgStore, Store
 
 log = logging.getLogger("canesat.line")
@@ -26,6 +31,8 @@ def create_app(
     settings: LineSettings | None = None,
     line_api: LineApi | None = None,
     store: Store | None = None,
+    verifier: IdTokenVerifier | None = None,
+    ingest: IngestQueue | None = None,
 ) -> FastAPI:
     settings = settings or LineSettings()
     if not settings.channel_secret:
@@ -35,10 +42,19 @@ def create_app(
             raise RuntimeError("LINE_CHANNEL_ACCESS_TOKEN is not set")
         line_api = LineClient(settings.channel_access_token)
     if store is None:
-        store = PgStore(settings.database_url) if settings.database_url else NullStore()
+        store = (
+            PgStore(settings.database_url, phone_key=os.environ.get("CANESAT_PHONE_KEY") or None)
+            if settings.database_url
+            else NullStore()
+        )
+    if verifier is None:
+        verifier = LineIdTokenVerifier(settings.login_channel_id)
+    if ingest is None and settings.database_url and settings.ingest_on_register:
+        dsn = settings.database_url
+        ingest = IngestQueue(lambda plot_id: ingest_plot(dsn, plot_id))
 
     parser = WebhookParser(settings.channel_secret)
-    router = EventRouter(line_api, store)
+    router = EventRouter(line_api, store, liff_url=settings.liff_url)
 
     app = FastAPI(
         title="เบิ่งไฮ่ (BerngHai) LINE webhook",
@@ -47,6 +63,9 @@ def create_app(
         openapi_url=None,
     )
     app.state.router = router
+    app.include_router(build_liff_router(settings, store, verifier, ingest))
+    app.mount("/liff/static", StaticFiles(directory=STATIC_DIR), name="liff-static")
+    log.info("app ready: %r", settings)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
