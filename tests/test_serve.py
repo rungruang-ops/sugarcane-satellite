@@ -27,3 +27,10 @@ def test_gives_up_without_raising():
         raise psycopg.OperationalError("down")
 
     assert migrate_with_retry("db", attempts=2, migrate=migrate, sleep=lambda s: None) is None
+
+
+def test_uvicorn_logs_go_to_stdout():
+    from canesat.line.serve import uvicorn_log_config
+
+    streams = {h["stream"] for h in uvicorn_log_config()["handlers"].values()}
+    assert streams == {"ext://sys.stdout"}

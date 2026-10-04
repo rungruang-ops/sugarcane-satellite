@@ -12,8 +12,10 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import os
+import sys
 import time
 from collections.abc import Callable
 
@@ -52,10 +54,21 @@ def migrate_with_retry(
     return None
 
 
+def uvicorn_log_config() -> dict:
+    """uvicorn's default logging, but everything on stdout (platforms tag stderr as errors)."""
+    from uvicorn.config import LOGGING_CONFIG
+
+    cfg = copy.deepcopy(LOGGING_CONFIG)
+    for handler in cfg["handlers"].values():
+        handler["stream"] = "ext://sys.stdout"
+    return cfg
+
+
 def main() -> None:
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "info").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        stream=sys.stdout,
     )
     dsn = os.environ.get("DATABASE_URL") or None
     if dsn and os.environ.get("CANESAT_MIGRATE_ON_START", "1") not in ("0", "false"):
@@ -71,6 +84,7 @@ def main() -> None:
         host="0.0.0.0",
         port=port,
         log_level=os.environ.get("LOG_LEVEL", "info").lower(),
+        log_config=uvicorn_log_config(),
         server_header=False,
         proxy_headers=True,
         forwarded_allow_ips="*",
