@@ -225,3 +225,17 @@ def test_unreachable_db_degrades():
     assert s.record_feedback(1, "weed", "U1", now) == "unavailable"
     assert s.plot_names("U1") is None
     assert s.status() == "unavailable"
+
+
+def test_settings_repr_masks_secrets_and_liff_id():
+    s = LineSettings(
+        channel_secret="SEKRET1",
+        channel_access_token="TOKEN2",
+        database_url="postgresql://u:pw3@h/db",
+        liff_id="2011859249-AbCdEfGh",
+    )
+    r = repr(s)
+    for value in ("SEKRET1", "TOKEN2", "pw3", "AbCdEfGh"):
+        assert value not in r
+    assert "liff_id=<set>" in r
+    assert "liff_id=None" in repr(LineSettings(channel_secret="x", liff_id=None))

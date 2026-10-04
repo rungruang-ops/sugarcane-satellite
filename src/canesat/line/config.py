@@ -43,5 +43,6 @@ class LineSettings:
         return (
             f"LineSettings(channel_secret={flag(self.channel_secret)}, "
             f"channel_access_token={flag(self.channel_access_token)}, "
-            f"database_url={flag(self.database_url, '<none>')}, liff_id={self.liff_id})"
+            f"database_url={flag(self.database_url, '<none>')}, "
+            f"liff_id={flag(self.liff_id, 'None')})"
         )
