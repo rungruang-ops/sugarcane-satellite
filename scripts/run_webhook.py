@@ -18,9 +18,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _secrets import load_secrets
+from _secrets import load_optional, load_secrets
 
 KEYS = ["LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"]
+# optional: LIFF app id (not secret) and the pgcrypto key for members' phone numbers
+OPTIONAL_KEYS = ["LIFF_ID", "CANESAT_PHONE_KEY"]
 
 
 def main() -> None:
@@ -36,10 +38,15 @@ def main() -> None:
 
     for k, v in load_secrets(args.secrets_json, KEYS).items():
         os.environ[k] = v  # overrides stale shell values
+    optional = load_optional(args.secrets_json, OPTIONAL_KEYS)
+    for k in OPTIONAL_KEYS:
+        if k in optional:
+            os.environ[k] = optional[k]
     if args.database_url:
         os.environ["DATABASE_URL"] = args.database_url
     print(
         f"[run_webhook] LINE secrets loaded from file; DB={'set' if args.database_url else 'none'};"
+        f" LIFF_ID={'set' if os.environ.get('LIFF_ID') else 'none'};"
         f" listening on {args.host}:{args.port}",
         flush=True,
     )

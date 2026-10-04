@@ -33,3 +33,11 @@ def load_secrets(path: str | Path, keys: list[str]) -> dict[str, str]:
     if missing:
         raise SystemExit(f"secrets file is missing keys: {', '.join(missing)}")
     return found
+
+
+def load_optional(path: str | Path | None, keys: list[str]) -> dict[str, str]:
+    """Like load_secrets but missing keys (or no file) are simply absent."""
+    if not path:
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        return find_keys(json.load(fh), set(keys))

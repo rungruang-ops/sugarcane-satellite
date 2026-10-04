@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>เพิ่มแปลงอ้อย · เบิ่งไฮ่</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="/liff/static/register.css">
+<script id="canesat-config" type="application/json">/*__CANESAT_CONFIG__*/{}</script>
+</head>
+<body>
+<header class="hdr">
+  <button id="btn-close" class="icon" aria-label="ปิด">✕</button>
+  <div class="t">เพิ่มแปลงอ้อย</div>
+  <span class="s">เบิ่งไฮ่</span>
+</header>
+<div id="banner" class="banner hidden"></div>
+<div id="lead" class="lead hidden">👥 คุณ <b>(หัวหน้ากลุ่ม)</b> กำลังลงทะเบียนแทน: <b id="lead-name">—</b></div>
+
+<div class="mapwrap">
+  <div id="map"></div>
+  <div class="tools">
+    <span class="tool on">✏️ แตะจุดรอบแปลง</span>
+    <button id="btn-undo" class="tool">↶ ย้อน</button>
+    <button id="btn-clear" class="tool">🗑️ ล้าง</button>
+    <button id="btn-locate" class="tool">📍 ฉันอยู่ไหน</button>
+  </div>
+  <div class="legend">ภาพดาวเทียม Esri World Imagery · เส้นประ = แปลงที่ลงทะเบียนแล้ว</div>
+</div>
+
+<main class="sheet">
+  <div class="h"></div>
+  <div class="row-between">
+    <div><div class="f m0">พื้นที่ (คำนวณอัตโนมัติ)</div><div class="area" id="area">— ไร่</div></div>
+    <span id="chip" class="chip">แตะอย่างน้อย 3 จุด</span>
+  </div>
+
+  <label class="f" for="name">ชื่อแปลง</label>
+  <input id="name" class="in" maxlength="60" placeholder="เช่น ไร่หลังบ้าน, ไร่โนนสูง" autocomplete="off">
+
+  <div class="f">ประเภทอ้อย</div>
+  <div class="seg" id="cane-type">
+    <button data-v="plant">อ้อยปลูก</button>
+    <button data-v="ratoon">อ้อยตอ</button>
+    <button data-v="unknown" class="on">ไม่แน่ใจ</button>
+  </div>
+
+  <label class="f" for="ref-date" id="date-label">ปลูก / ตัดครั้งล่าสุด (ประมาณ)</label>
+  <input id="ref-date" class="in" type="month">
+
+  <div class="toggle">
+    <label><input type="checkbox" id="on-behalf"> 👥 ลงทะเบียนแทนสมาชิก (หัวหน้ากลุ่ม)</label>
+  </div>
+  <div id="member" class="member hidden">
+    <label class="f" for="member-name">ชื่อเจ้าของแปลง</label>
+    <input id="member-name" class="in" maxlength="80" placeholder="เช่น นางบุญมี ใจดี">
+    <label class="f" for="member-phone">เบอร์โทรเจ้าของแปลง (ไม่บังคับ — ใช้ยืนยันความยินยอมทาง SMS ภายหลัง)</label>
+    <input id="member-phone" class="in" inputmode="tel" maxlength="20" placeholder="08x-xxx-xxxx">
+  </div>
+
+  <section class="consent">
+    <h3>📝 ความยินยอม (PDPA)</h3>
+    <div class="note" id="consent-note">เลือกได้ทีละข้อ ข้อ "จำเป็น" ต้องติ๊กก่อนบันทึก</div>
+    <label class="ck"><input type="checkbox" id="c-service"><span><b>จำเป็น:</b> เก็บขอบเขตแปลง ชื่อ และ LINE เพื่อส่งแจ้งเตือนสภาพอ้อยและฝน</span></label>
+    <label class="ck"><input type="checkbox" id="c-leader"><span>ให้หัวหน้ากลุ่มเห็นสถานะแปลงและรับแจ้งเตือนแทน</span></label>
+    <label class="ck"><input type="checkbox" id="c-research"><span>ใช้ข้อมูลแบบไม่ระบุตัวตนรวมกับคนอื่น เพื่อปรับปรุงระบบ</span></label>
+    <div class="ck info"><span>🔒 แชร์ข้อมูลแปลงกับหน่วยงานอื่น (เช่น สถาบันการเงิน) — <b>จะถามทุกครั้งก่อนแชร์</b> ไม่แชร์โดยไม่ได้รับอนุญาต</span></div>
+    <label class="ck hidden" id="assist-row"><input type="checkbox" id="c-assist"><span><b>หัวหน้ากลุ่ม:</b> ได้อ่านข้อความนี้ให้เจ้าของแปลงฟัง และเจ้าของแปลงยินยอมแล้ว (เจ้าของแปลงจะยืนยันเองอีกครั้งภายหลัง)</span></label>
+    <div class="note">ถอนความยินยอม/ขอลบข้อมูลได้ทุกเมื่อจากเมนู "วิธีใช้/ติดต่อ" · ข้อความนี้เป็นร่าง ต้องให้นักกฎหมายตรวจตาม PDPA</div>
+  </section>
+
+  <div id="err" class="err hidden"></div>
+  <div class="actions">
+    <button id="btn-undo2" class="btn o">↶ แก้</button>
+    <button id="btn-save" class="btn g" disabled>บันทึกแปลง</button>
+  </div>
+
+  <section class="mine" id="my-plots">
+    <h3>🗺️ แปลงของฉัน</h3>
+    <div id="mine-list" class="note">กำลังโหลด…</div>
+  </section>
+</main>
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="/liff/static/register.js"></script>
+</body>
+</html>

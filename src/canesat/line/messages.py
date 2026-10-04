@@ -110,7 +110,41 @@ def help_menu() -> list[Message]:
     return [text(body)]
 
 
-def my_plots(plot_names: list[str] | None) -> list[Message]:
+def _link_bubble(alt: str, title: str, body: str, label: str, uri: str) -> Message:
+    return {
+        "type": "flex",
+        "altText": alt,
+        "contents": {
+            "type": "bubble",
+            "size": "kilo",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {"type": "text", "text": title, "weight": "bold", "size": "md", "wrap": True},
+                    {"type": "text", "text": body, "size": "sm", "wrap": True},
+                ],
+            },
+            "footer": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "button",
+                        "style": "primary",
+                        "color": "#06C755",
+                        "height": "sm",
+                        "action": {"type": "uri", "label": label, "uri": uri},
+                    }
+                ],
+            },
+        },
+        "quickReply": main_quick_reply(),
+    }
+
+
+def my_plots(plot_names: list[str] | None, liff_url: str | None = None) -> list[Message]:
     if plot_names:
         lines = "\n".join(f"• {n}" for n in plot_names[:10])
         more = f"\n…และอีก {len(plot_names) - 10} แปลง" if len(plot_names) > 10 else ""
@@ -118,12 +152,33 @@ def my_plots(plot_names: list[str] | None) -> list[Message]:
             f"🗺️ แปลงของคุณ ({len(plot_names)} แปลง)\n{lines}{more}\n\n"
             "หน้ากราฟเทียบเพื่อนบ้าน/ปีที่แล้วกำลังจะเปิดเร็ว ๆ นี้ครับ"
         )
-    else:
-        body = (
-            "🗺️ ยังไม่มีแปลงที่ลงทะเบียนไว้ครับ\n"
-            "การลงทะเบียนแปลงจะเปิดเร็ว ๆ นี้ — วาดแปลงบนภาพดาวเทียม หรือให้หัวหน้ากลุ่มช่วยลงให้\n"
-            f'เมื่อพร้อมแล้ว {BOT_NAME} จะส่งข้อความ "แปลงของคุณพร้อมแล้ว" ให้ครับ'
-        )
+        msgs = [text(body)]
+        if liff_url:
+            msgs.append(
+                _link_bubble(
+                    "เพิ่มแปลง / ดูแปลงบนแผนที่",
+                    "🗺️ ดูแปลงบนแผนที่",
+                    "ดูขอบเขตแปลงที่ลงทะเบียนไว้ หรือเพิ่มแปลงใหม่",
+                    "เปิดหน้าแปลงของฉัน",
+                    f"{liff_url}?view=my",
+                )
+            )
+        return msgs
+    if liff_url:
+        return [
+            _link_bubble(
+                "ยังไม่มีแปลงที่ลงทะเบียนไว้ — กดเพิ่มแปลง",
+                "🗺️ ยังไม่มีแปลงที่ลงทะเบียนไว้ครับ",
+                "วาดขอบเขตแปลงบนภาพดาวเทียมได้เลย ใช้เวลาไม่กี่นาที หรือให้หัวหน้ากลุ่มช่วยลงให้",
+                "➕ เพิ่มแปลง",
+                liff_url,
+            )
+        ]
+    body = (
+        "🗺️ ยังไม่มีแปลงที่ลงทะเบียนไว้ครับ\n"
+        "การลงทะเบียนแปลงจะเปิดเร็ว ๆ นี้ — วาดแปลงบนภาพดาวเทียม หรือให้หัวหน้ากลุ่มช่วยลงให้\n"
+        f'เมื่อพร้อมแล้ว {BOT_NAME} จะส่งข้อความ "แปลงของคุณพร้อมแล้ว" ให้ครับ'
+    )
     return [text(body)]
 
 
@@ -150,11 +205,35 @@ def rain_info() -> list[Message]:
     return [text(body)]
 
 
-def add_plot() -> list[Message]:
+def add_plot(liff_url: str | None = None) -> list[Message]:
+    if liff_url:
+        return [
+            _link_bubble(
+                "เพิ่มแปลงอ้อย — วาดขอบเขตแปลงบนภาพดาวเทียม",
+                "➕ เพิ่มแปลงอ้อย",
+                "แตะจุดรอบแปลงบนภาพดาวเทียม ตั้งชื่อแปลง เลือกอ้อยปลูก/อ้อยตอ แล้วกดบันทึก\n"
+                "หัวหน้ากลุ่มลงทะเบียนแทนสมาชิกได้ (เจ้าของแปลงต้องยินยอม)",
+                "➕ เพิ่มแปลง",
+                liff_url,
+            )
+        ]
     body = (
         "➕ การลงทะเบียนแปลงกำลังจะเปิดเร็ว ๆ นี้ครับ\n"
         "จะวาดแปลงบนภาพดาวเทียม หรือเดินรอบแปลงด้วย GPS ก็ได้ "
         "ถ้าไม่ถนัด หัวหน้ากลุ่มช่วยลงให้ได้ (เจ้าของแปลงต้องกดยินยอมเอง)"
+    )
+    return [text(body)]
+
+
+# text the LIFF page sends into the chat after a successful registration (liff.sendMessages)
+REGISTERED_PREFIX = "✅ ลงทะเบียนแปลง"
+
+
+def registered_ack() -> list[Message]:
+    body = (
+        f"🙏 ได้รับแล้วครับ {BOT_NAME}กำลังดึงภาพดาวเทียมย้อนหลังของแปลงนี้\n"
+        "ภายในวันสองวันจะเทียบกับแปลงรอบ ๆ ได้ — "
+        'พิมพ์ "แปลงของฉัน" เพื่อดูแปลงที่ลงทะเบียนไว้ได้ตลอดครับ'
     )
     return [text(body)]
 
