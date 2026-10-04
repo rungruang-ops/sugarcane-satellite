@@ -64,7 +64,7 @@ def _obs(d, ndvi, i, clear=True):
 
 
 def test_migrate_insert_ingest_detect(conn, schema, monkeypatch, tmp_path):
-    assert db.migrate(conn) == ["0001_init.sql"]
+    assert db.migrate(conn) == ["0001_init.sql", "0002_line_users.sql"]
     assert db.migrate(conn) == []  # idempotent
 
     geom = mapping(square_around(16.5589, 102.4372, 1000))
