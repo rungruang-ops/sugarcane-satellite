@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+.cache
+.pytest_cache
+.ruff_cache
+**/__pycache__
+*.pyc
+.env
+data
+docs
+examples
+tests
+*.tif
+*.npz
