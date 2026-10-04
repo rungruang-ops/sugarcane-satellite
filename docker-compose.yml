@@ -1,0 +1,23 @@
+# Local development database: PostgreSQL 16 + PostGIS 3.4
+#   docker compose up -d db
+#   export DATABASE_URL=postgresql://canesat:canesat@localhost:5433/canesat
+#   canesat db migrate
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: canesat
+      POSTGRES_PASSWORD: canesat
+      POSTGRES_DB: canesat
+    ports:
+      - "${POSTGIS_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canesat -d canesat"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:

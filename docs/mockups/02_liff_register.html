@@ -1,0 +1,36 @@
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="assets/base.css"><style>
+.map{position:absolute;top:94px;left:0;width:390px;height:456px;background:url(assets/s2_nongruea.png) -200px -330px/780px 1300px;overflow:hidden}
+.tools{position:absolute;top:10px;left:10px;display:flex;gap:6px}
+.tools span{background:#fff;border-radius:18px;font-size:12.5px;font-weight:700;padding:5px 10px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.tools .on{background:#06c755;color:#fff}
+.lead{position:absolute;top:94px;left:0;right:0;z-index:5;background:#fff8e1;font-size:12.5px;padding:5px 12px;border-bottom:1px solid #ffe082}
+.sheet{position:absolute;top:548px;left:0;width:390px;bottom:0;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -2px 10px rgba(0,0,0,.15);padding:10px 16px}
+.h{width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 8px}
+.f{font-size:12px;color:#6b7280;margin-top:7px}.in{border:1px solid #d1d5db;border-radius:8px;padding:6px 10px;font-size:14.5px}
+.seg{display:flex;gap:6px}.seg span{flex:1;text-align:center;border:1px solid #d1d5db;border-radius:8px;padding:5px;font-size:13.5px}.seg .on{border-color:#06c755;background:#e9f9ef;color:#068a3e;font-weight:700}
+.area{font-size:22px;font-weight:800;color:#1b5e20}
+.legend{position:absolute;bottom:4px;left:6px;right:6px;background:rgba(255,255,255,.9);font-size:10.5px;padding:3px 7px;border-radius:6px}
+</style></head><body>
+<div class="status"><span>9:41</span><span>📶 🔋</span></div>
+<div class="mock">MOCKUP · ข้อมูลตัวอย่าง</div>
+<div class="hdr"><span>✕</span><div class="t">เพิ่มแปลงอ้อย</div><span class="s">LIFF</span></div>
+<div class="map">
+ <div class="lead" style="position:absolute;top:0">👥 คุณ <b>(หัวหน้ากลุ่ม)</b> กำลังลงทะเบียนแทน: <b>นางบุญมี (ชื่อสมมติ)</b></div>
+ <svg width="390" height="470" style="position:absolute;top:0;left:0">
+  <polygon points="40,330 110,300 125,360 55,385" fill="none" stroke="#fff" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <polygon points="250,250 320,232 334,290 262,305" fill="none" stroke="#fff" stroke-width="1.3" stroke-dasharray="4 3"/>
+  <polygon points="168,150 247,128 268,212 186,236" fill="rgba(6,199,85,.25)" stroke="#06c755" stroke-width="3"/>
+  <g fill="#fff" stroke="#06c755" stroke-width="3"><circle cx="168" cy="150" r="7"/><circle cx="247" cy="128" r="7"/><circle cx="268" cy="212" r="7"/><circle cx="186" cy="236" r="7"/></g>
+  <circle cx="300" cy="400" r="8" fill="#1e88e5" stroke="#fff" stroke-width="3"/>
+ </svg>
+ <div class="tools" style="top:38px"><span class="on">✏️ วาด</span><span>🚶 เดินรอบแปลง (GPS)</span><span>📁 ไฟล์ KML</span></div>
+ <div class="legend">ภาพ Sentinel-2 จริง 1 ธ.ค. 2568 · ใกล้ อ.หนองเรือ · เส้นประ = แปลงที่ลงทะเบียนแล้ว</div>
+</div>
+<div class="sheet"><div class="h"></div>
+ <div style="display:flex;justify-content:space-between;align-items:center"><div><div class="f" style="margin:0">พื้นที่ (คำนวณอัตโนมัติ)</div><div class="area">≈ 24 ไร่</div></div><span class="chip grn">✓ ขอบเขตถูกต้อง</span></div>
+ <div class="f">ชื่อแปลง</div><div class="in">ไร่โนนสูง</div>
+ <div class="f">ประเภทอ้อย</div><div class="seg"><span>ปลูกใหม่</span><span class="on">อ้อยตอ</span><span>ไม่แน่ใจ</span></div>
+ <div class="f">ตัดครั้งล่าสุด / ปลูกเมื่อ (ประมาณ)</div><div class="in">ก.พ. 2569</div>
+ <div style="display:flex;gap:8px;margin-top:10px"><span class="btn o" style="flex:1">↶ แก้</span><span class="btn g" style="flex:2.2">บันทึกแปลง</span></div>
+</div>
+</body></html>
