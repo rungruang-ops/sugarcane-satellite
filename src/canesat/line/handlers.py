@@ -69,11 +69,13 @@ def _short(uid: str | None) -> str:
 
 class EventRouter:
     def __init__(
-        self, line: LineApi, store: Store | None = None, liff_url: str | None = None
+        self, line: LineApi, store: Store | None = None, liff_url: str | None = None,
+        public_base_url: str | None = None,
     ) -> None:
         self.line = line
         self.store: Store = store or NullStore()
         self.liff_url = liff_url
+        self.public_base_url = (public_base_url or "").rstrip("/") or None
         self._handlers: list[tuple[type, Callable[[Any], Replies | None]]] = [
             (FollowEvent, self.on_follow),
             (UnfollowEvent, self.on_unfollow),
@@ -130,7 +132,10 @@ class EventRouter:
             uid = _user_id(event)
             return m.my_plots(self.store.plot_names(uid) if uid else None, self.liff_url)
         if intent == "compare":
-            return m.compare_neighbours()
+            chart = f"{self.public_base_url}/liff/chart" if self.public_base_url else (
+                f"{self.liff_url}?view=chart" if self.liff_url else None
+            )
+            return m.compare_neighbours(chart)
         if intent == "add_plot":
             return m.add_plot(self.liff_url)
         if intent == "leader":

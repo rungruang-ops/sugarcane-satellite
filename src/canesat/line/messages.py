@@ -182,12 +182,23 @@ def my_plots(plot_names: list[str] | None, liff_url: str | None = None) -> list[
     return [text(body)]
 
 
-def compare_neighbours() -> list[Message]:
+def compare_neighbours(chart_url: str | None = None) -> list[Message]:
+    if chart_url:
+        return [
+            _link_bubble(
+                "เทียบเพื่อนบ้านและปีที่แล้ว",
+                "📊 เทียบเพื่อนบ้าน & ปีที่แล้ว",
+                "กราฟ 3 เส้น: แปลงของคุณปีนี้, แปลงรอบ ๆ ปีนี้ และแปลงของคุณปีที่แล้ว "
+                "พร้อมสถานะ ปกติ / เฝ้าระวัง / ควรไปดู",
+                "📈 เปิดกราฟเทียบ",
+                chart_url,
+            )
+        ]
     body = (
         "📊 เทียบเพื่อนบ้าน & ปีที่แล้ว\n"
         "เมื่อลงทะเบียนแปลงแล้ว จะเห็นกราฟ 3 เส้น: แปลงของคุณปีนี้, แปลงรอบ ๆ ปีนี้ "
         "และแปลงของคุณปีที่แล้ว พร้อมบอกว่า ปกติ / เฝ้าระวัง / ควรไปดู\n"
-        "⏳ หน้านี้กำลังจะเปิดเร็ว ๆ นี้ครับ"
+        "พิมพ์ \"แปลงของฉัน\" แล้วเปิดหน้ากราฟจากรายการแปลงได้ครับ"
     )
     return [text(body)]
 
@@ -259,6 +270,13 @@ def non_text_received() -> list[Message]:
 
 def feedback_thanks(answer: str, status: str) -> list[Message]:
     label = FEEDBACK_CHOICES.get(answer, answer)
+    if status == "forbidden":
+        return [
+            text(
+                "ขออภัยครับ ปุ่มตอบนี้ใช้ได้เฉพาะเจ้าของแปลง"
+                "หรือหัวหน้ากลุ่มที่ได้รับการยินยอมเท่านั้น"
+            )
+        ]
     if answer == "no_problem":
         body = f"✅ ดีใจด้วยครับ บันทึกว่า {label} แล้ว\nขอบคุณที่ไปดูแปลง ช่วยให้{BOT_NAME}แม่นขึ้นครับ"
     else:
@@ -269,6 +287,26 @@ def feedback_thanks(answer: str, status: str) -> list[Message]:
     if status == "not_found":
         body += "\n(ไม่พบการแจ้งเตือนนี้ในระบบแล้ว)"
     return [text(body)]
+
+
+def consent_confirm_prompt(plot_name: str, token_url: str) -> list[Message]:
+    return [
+        _link_bubble(
+            f"ยืนยันความยินยอมสำหรับแปลง {plot_name}",
+            "📝 ยืนยันความยินยอม",
+            (
+                f'หัวหน้ากลุ่มลงทะเบียนแปลง "{plot_name}" แทนคุณไว้ — '
+                f"กดยืนยันถ้าคุณเป็นเจ้าของแปลงและยินยอมให้{BOT_NAME}ดูแล"
+            ),
+            "✅ ยืนยันความยินยอม",
+            token_url,
+        )
+    ]
+
+
+def consent_confirmed(plot_name: str | None = None) -> list[Message]:
+    who = f'แปลง "{plot_name}"' if plot_name else "แปลงของคุณ"
+    return [text(f"✅ บันทึกความยินยอมแล้วครับ {who}พร้อมใช้งาน\nพิมพ์ \"แปลงของฉัน\" เพื่อดูรายการแปลง")]
 
 
 def rain_report_thanks(answer: str) -> list[Message]:
@@ -451,4 +489,148 @@ def build_greenness_alert_flex(
                 for a in answers
             ]
         },
+    }
+
+
+def rain_report_postback_data(alert_id: int, answer: str) -> str:
+    if answer not in RAIN_REPORT_CHOICES:
+        raise ValueError(f"unknown rain report answer: {answer}")
+    return urlencode({"action": "rain_report", "alert_id": alert_id, "answer": answer})
+
+
+def build_rain_gap_flex(
+    *,
+    alert_id: int,
+    dry_days: int,
+    tambon: str | None = None,
+    guidance: list[str] | None = None,
+    soil_moisture: float | None = None,
+) -> Message:
+    """Orange rain-gap alert (design section 8.2). Push only when ENABLE_PUSH_ALERTS=true."""
+    where = f" (แถว {tambon})" if tambon else ""
+    title = f"🟠 ฝนไม่ค่อยตกมา {dry_days} วันแล้ว{where}"
+    body_bits = []
+    if soil_moisture is not None:
+        body_bits.append("ดินแห้งกว่าปกติของช่วงนี้")
+    else:
+        body_bits.append("ดินในพื้นที่อาจแห้ง — ตรวจความชื้นดินที่ไร่ด้วยถ้าได้")
+    for g in guidance or []:
+        g = g.strip()
+        if not g:
+            continue
+        if "ให้น้ำ" in g or g.startswith("ถ้ามีน้ำ"):
+            body_bits.append(f"✅ {g}")
+        elif "ปุ๋ย" in g or "คลุมดิน" in g or g.startswith("ยัง"):
+            body_bits.append(f"⏸️ {g}")
+        else:
+            body_bits.append(f"• {g}")
+    body_bits.append("(ข้อมูลฝนเป็นภาพรวมของพื้นที่ ไม่ใช่ที่แปลงพอดี)")
+    detail = "\n".join(body_bits)
+
+    answers = list(RAIN_REPORT_CHOICES)
+    footer = [
+        {
+            "type": "text",
+            "text": "ฝนที่ไร่คุณตกบ้างไหม?",
+            "size": "sm",
+            "weight": "bold",
+            "wrap": True,
+        },
+        {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "secondary",
+                    "height": "sm",
+                    "flex": 1,
+                    "action": {
+                        "type": "postback",
+                        "label": RAIN_REPORT_CHOICES[a],
+                        "data": rain_report_postback_data(alert_id, a),
+                        "displayText": RAIN_REPORT_CHOICES[a],
+                    },
+                }
+                for a in answers
+            ],
+        },
+    ]
+    return {
+        "type": "flex",
+        "altText": title,
+        "contents": {
+            "type": "bubble",
+            "size": "kilo",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": title,
+                        "weight": "bold",
+                        "size": "md",
+                        "color": "#EF6C00",
+                        "wrap": True,
+                    },
+                    {"type": "text", "text": detail, "size": "sm", "wrap": True},
+                ],
+            },
+            "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer},
+        },
+        "quickReply": {
+            "items": [
+                _qr_postback(
+                    RAIN_REPORT_CHOICES[a],
+                    rain_report_postback_data(alert_id, a),
+                    RAIN_REPORT_CHOICES[a],
+                )
+                for a in answers
+            ]
+        },
+    }
+
+
+def build_rain_back_flex(*, precip_3d_mm: float, tambon: str | None = None) -> Message:
+    """Rain returned — good fertiliser window (design section 8.3)."""
+    where = f" ใน{tambon}" if tambon else " ในพื้นที่"
+    title = "🌧️ ฝนกลับมาแล้ว"
+    detail = (
+        f"3 วันที่ผ่านมา ฝนสะสมประมาณ {precip_3d_mm:.0f} มม.{where}\n"
+        "ดินน่าจะชื้นพอ — ถ้าวางแผนใส่ปุ๋ยไว้ ช่วงนี้เป็นจังหวะที่ดี"
+    )
+    return {
+        "type": "flex",
+        "altText": f"{title} — จังหวะดีสำหรับใส่ปุ๋ย",
+        "contents": {
+            "type": "bubble",
+            "size": "kilo",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": title,
+                        "weight": "bold",
+                        "size": "md",
+                        "color": "#1565C0",
+                        "wrap": True,
+                    },
+                    {"type": "text", "text": detail, "size": "sm", "wrap": True},
+                    {
+                        "type": "text",
+                        "text": "(ข้อมูลฝนเป็นภาพรวมของพื้นที่)",
+                        "size": "xs",
+                        "color": "#888888",
+                        "wrap": True,
+                    },
+                ],
+            },
+        },
+        "quickReply": main_quick_reply(),
     }

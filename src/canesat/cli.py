@@ -13,6 +13,7 @@ from typing import Any
 import click
 
 from .config import AnomalyConfig, IngestConfig, Settings, ingest_config_from, load_toml_config
+from .weather.config import RainConfig
 
 
 def _json_default(o: Any) -> Any:
@@ -49,6 +50,14 @@ class Ctx:
         if conn is not None:
             cfg = cfg.merged(db.get_setting(conn, "anomaly") or {})
         return cfg.merged(self.toml.get("anomaly", {}))
+
+    def rain_cfg(self, conn=None) -> RainConfig:
+        from . import db
+
+        cfg = RainConfig()
+        if conn is not None:
+            cfg = cfg.merged(db.get_setting(conn, "rain") or {})
+        return cfg.merged(self.toml.get("rain", {}))
 
 
 @click.group()
@@ -368,6 +377,155 @@ def preview_cmd(c: Ctx, center, size_m, start, end, workers, out) -> None:
     if out:
         Path(out).write_text(text + "\n", encoding="utf-8")
     click.echo(text if not out else f"wrote {out}")
+
+
+
+# ------------------------------------------------------------------ weather / notify
+@main.command("rain-check")
+@click.option("--plot-id", "plot_ids", type=int, multiple=True)
+@click.option("--all", "all_plots", is_flag=True)
+@click.option("--as-of", type=click.DateTime(["%Y-%m-%d"]), default=None)
+@click.option("--no-soil", is_flag=True, help="Skip SMAP (rain only).")
+@click.option(
+    "--fixture-rain",
+    type=click.Path(exists=True, dir_okay=False),
+    help="JSON {YYYY-MM-DD: mm} instead of live GPM (for tests / demos).",
+)
+@click.option(
+    "--fixture-soil",
+    type=click.Path(exists=True, dir_okay=False),
+    help="JSON {YYYY-MM-DD: m3/m3} instead of live SMAP.",
+)
+@click.pass_obj
+def rain_check_cmd(c: Ctx, plot_ids, all_plots, as_of, no_soil, fixture_rain, fixture_soil) -> None:
+    """Fetch GPM (+ SMAP) for plots, detect rain_gap / rain_back, store alerts.
+
+    Push is NOT sent here — run `canesat notify` (still gated by ENABLE_PUSH_ALERTS).
+    """
+    from datetime import date as date_cls
+
+    from .weather.job import run_weather_check
+
+    if bool(plot_ids) == all_plots:
+        raise click.UsageError("give --plot-id (one or more) or --all")
+    as_of_d = as_of.date() if as_of else date_cls.today()
+
+    if fixture_rain:
+        rain_map = {
+            date_cls.fromisoformat(k): v
+            for k, v in json.loads(Path(fixture_rain).read_text()).items()
+        }
+        from .weather.gpm import FixtureRainFetcher
+
+        rain = FixtureRainFetcher(rain_map)
+    else:
+        from .weather.earthdata import earthdata_session
+        from .weather.gpm import GpmImergFetcher
+
+        rain = GpmImergFetcher(earthdata_session())
+
+    if fixture_soil:
+        soil_map = {
+            date_cls.fromisoformat(k): (v, 0)
+            for k, v in json.loads(Path(fixture_soil).read_text()).items()
+        }
+        from .weather.smap import FixtureSoilFetcher
+
+        soil = FixtureSoilFetcher(soil_map)
+    elif no_soil:
+        from .weather.smap import FixtureSoilFetcher
+
+        soil = FixtureSoilFetcher({})
+    else:
+        from .weather.earthdata import earthdata_session
+        from .weather.smap import SmapFetcher
+
+        soil = SmapFetcher(earthdata_session())
+
+    with c.conn() as conn:
+        cfg = c.rain_cfg(conn)
+        summary = run_weather_check(
+            conn,
+            rain=rain,
+            soil=soil,
+            cfg=cfg,
+            plot_ids=list(plot_ids) or None,
+            as_of=as_of_d,
+            fetch_soil=not no_soil,
+        )
+    click.echo(_dump(summary))
+
+
+@main.command("notify")
+@click.option("--enable-push/--dry-run", default=None,
+              help="Override ENABLE_PUSH_ALERTS for this run. Default = env (off).")
+@click.option("--type", "types", multiple=True,
+              type=click.Choice(["greenness", "rain_gap", "rain_back", "harvest_check"]))
+@click.pass_obj
+def notify_cmd(c: Ctx, enable_push, types) -> None:
+    """Deliver pending alerts: dry-run by default; real push only if ENABLE_PUSH_ALERTS=true.
+
+    Never enable push on Railway without Sam saying yes (LINE OA Free = 300 msgs/month).
+    """
+    import os
+
+    from . import notify as notify_mod
+    from .line.client import LineClient
+
+    enabled = notify_mod.push_alerts_enabled() if enable_push is None else enable_push
+    push = None
+    if enabled:
+        token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+        if not token:
+            raise click.UsageError("LINE_CHANNEL_ACCESS_TOKEN required when push is enabled")
+        push = LineClient(token)
+    public = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+    if public and not public.startswith("http"):
+        public = "https://" + public
+    with c.conn() as conn:
+        report = notify_mod.deliver_pending(
+            conn,
+            push,
+            enable_push=enabled,
+            types=list(types) or None,
+            graph_base_url=public,
+        )
+    click.echo(_dump(report))
+
+
+@main.command("anomaly-notify")
+@click.option("--plot-id", "plot_ids", type=int, multiple=True)
+@click.option("--all", "all_plots", is_flag=True)
+@click.option("--enable-push/--dry-run", default=None)
+@click.pass_obj
+def anomaly_notify_cmd(c: Ctx, plot_ids, all_plots, enable_push) -> None:
+    """Run NDVI anomaly detection then queue/dry-run LINE alerts (same push gate)."""
+    import os
+
+    from . import notify as notify_mod
+    from .detect import run_detect
+    from .line.client import LineClient
+
+    if bool(plot_ids) == all_plots:
+        raise click.UsageError("give --plot-id (one or more) or --all")
+    with c.conn() as conn:
+        cfg = c.anomaly_cfg(conn)
+        detect_summary = run_detect(conn, list(plot_ids) or None, cfg)
+        enabled = notify_mod.push_alerts_enabled() if enable_push is None else enable_push
+        push = None
+        if enabled:
+            token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+            if not token:
+                raise click.UsageError("LINE_CHANNEL_ACCESS_TOKEN required when push is enabled")
+            push = LineClient(token)
+        public = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+        if public and not public.startswith("http"):
+            public = "https://" + public
+        notify_report = notify_mod.deliver_pending(
+            conn, push, enable_push=enabled, types=["greenness", "harvest_check"],
+            graph_base_url=public,
+        )
+    click.echo(_dump({"detect": detect_summary, "notify": notify_report}))
 
 
 if __name__ == "__main__":

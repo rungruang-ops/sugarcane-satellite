@@ -73,10 +73,15 @@ def payload(*events: dict[str, Any]) -> str:
 class FakeLine:
     def __init__(self, display_name: str | None = "สมาน") -> None:
         self.replies: list[tuple[str, list[dict[str, Any]]]] = []
+        self.pushes: list[tuple[str, list[dict[str, Any]]]] = []
         self.name = display_name
 
     def reply(self, reply_token: str, messages: list[dict[str, Any]]) -> bool:
         self.replies.append((reply_token, messages))
+        return True
+
+    def push(self, user_id: str, messages: list[dict[str, Any]]) -> bool:
+        self.pushes.append((user_id, messages))
         return True
 
     def display_name(self, user_id: str) -> str | None:
@@ -104,6 +109,22 @@ class FakeStore:
         self.calls.append(("feedback", alert_id, answer, line_user_id))
         return self.feedback_status
 
+    def confirm_consent(self, token, line_user_id, at):
+        self.calls.append(("confirm_consent", token, line_user_id))
+        return "not_found"
+
+    def pending_consents_for(self, line_user_id):
+        return []
+
+    def chart_series(self, plot_id, line_user_id=None):
+        return None
+
     def plot_names(self, line_user_id: str):
         self.calls.append(("plots", line_user_id))
         return self.plots
+
+    def create_plot(self, reg):
+        raise NotImplementedError
+
+    def list_plots(self, line_user_id):
+        return []

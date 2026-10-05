@@ -31,6 +31,12 @@ class LineSettings:
     ingest_on_register: bool = field(
         default_factory=lambda: (_env("CANESAT_INGEST_ON_REGISTER") or "1") not in ("0", "false")
     )
+    # Push alerts OFF by default (LINE OA Free = 300 msgs/month). Never enable on Railway
+    # without an explicit Sam yes.
+    enable_push_alerts: bool = field(
+        default_factory=lambda: (_env("ENABLE_PUSH_ALERTS") or "false").lower()
+        in ("1", "true", "yes", "on")
+    )
 
     @property
     def liff_url(self) -> str | None:

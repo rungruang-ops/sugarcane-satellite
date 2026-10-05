@@ -54,7 +54,12 @@ def create_app(
         ingest = IngestQueue(lambda plot_id: ingest_plot(dsn, plot_id))
 
     parser = WebhookParser(settings.channel_secret)
-    router = EventRouter(line_api, store, liff_url=settings.liff_url)
+    public_base = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+    if public_base and not public_base.startswith("http"):
+        public_base = "https://" + public_base
+    router = EventRouter(
+        line_api, store, liff_url=settings.liff_url, public_base_url=public_base
+    )
 
     app = FastAPI(
         title="เบิ่งไฮ่ (BerngHai) LINE webhook",
