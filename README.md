@@ -131,9 +131,9 @@ Following [`docs/design.md`](docs/design.md) §16:
    `users`, keyword replies, feedback postbacks → `alerts.feedback`, Flex alert builder, Rich Menu
    spec ([`docs/line-webhook.md`](docs/line-webhook.md)). Todo: notify job with push quota counter
    (300/month free tier) and quiet hours.
-3. 🚧 **LIFF**: ✅ plot registration (draw on satellite map, consent, leader-assisted), plot page (F3: plot vs neighbours vs last year),
-   group page for leaders, PDPA consent flows (design §6) → `consent`, `audit_log` tables.
-4. **GPM IMERG + SMAP drought / rain-back alerts** (F2) — needs a NASA **Earthdata login**
-   (`EARTHDATA_USERNAME/PASSWORD`).
+3. 🚧 **LIFF**: ✅ plot registration, ✅ comparison chart (`/liff/chart`), ✅ member consent confirm
+   (`/liff/consent`); group page for leaders still open.
+4. ✅ **GPM IMERG + SMAP drought / rain-back alerts** (F2) — `canesat rain-check` + gated
+   `canesat notify` (`ENABLE_PUSH_ALERTS=false` by default). See [`docs/jobs.md`](docs/jobs.md).
 5. Scheduler (cron in Docker: `s2_fetch` every 12 h, `backfill_plot` on registration,
    `cane_mask_refresh` yearly), monitoring, Earth Search fallback STAC.

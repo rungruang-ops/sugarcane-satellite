@@ -162,9 +162,17 @@ def test_create_and_list_plots_self_and_on_behalf(schema):
     assert {c["purpose"]: c["granted"] for c in consents} == {
         "leader_view": False,
         "research": False,
-        "service": True,
+        "service": False,  # pending until member confirms
     }
     assert all(c["method"] == "assisted_pending" and c["assisted_by"] for c in consents)
+    # confirm_token is on the row (migration 0004)
+    tok = _q(
+        schema,
+        "SELECT confirm_token, confirmed_at FROM consents"
+        " WHERE plot_id = %s AND purpose = 'service'",
+        (member["id"],),
+    )[0]
+    assert tok["confirm_token"] and tok["confirmed_at"] is None
 
 
 def test_create_plot_without_phone_key_does_not_store_phone(schema):

@@ -23,6 +23,8 @@ dependencies = [
   "fastapi>=0.110",
   "uvicorn>=0.29",
   "line-bot-sdk>=3.11,<4",
+  "requests>=2.31",
+  "pydap>=3.5",
 ]
 
 [project.optional-dependencies]
@@ -46,8 +48,9 @@ ignore = ["RUF001", "RUF002", "RUF003"]  # Thai text in strings/comments is inte
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -m 'not network'"
+addopts = "-ra -m 'not network and not earthdata'"
 markers = [
   "network: needs internet access to Planetary Computer (skipped by default; run with -m network)",
+  "earthdata: needs EARTHDATA_TOKEN + network (skipped by default; run with -m earthdata)",
   "db: needs a PostGIS database at DATABASE_URL (skipped when DATABASE_URL is unset)",
 ]

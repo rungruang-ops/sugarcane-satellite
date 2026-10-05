@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
 import psycopg
@@ -17,7 +18,7 @@ from psycopg.rows import dict_row
 
 log = logging.getLogger(__name__)
 
-FeedbackStatus = Literal["recorded", "not_found", "unavailable"]
+FeedbackStatus = Literal["recorded", "not_found", "unavailable", "forbidden"]
 MAX_PLOTS_PER_USER = 50
 
 
@@ -49,6 +50,14 @@ class Store(Protocol):
 
     def list_plots(self, line_user_id: str) -> list[dict[str, Any]]: ...
 
+    def confirm_consent(self, token: str, line_user_id: str, at: datetime) -> str: ...
+
+    def pending_consents_for(self, line_user_id: str) -> list[dict[str, Any]]: ...
+
+    def chart_series(
+        self, plot_id: int, line_user_id: str | None = None
+    ) -> dict[str, Any] | None: ...
+
 
 class NullStore:
     """No database configured: nothing is persisted."""
@@ -66,6 +75,17 @@ class NullStore:
         self, alert_id: int, answer: str, line_user_id: str | None, at: datetime
     ) -> FeedbackStatus:
         return "unavailable"
+
+    def confirm_consent(self, token: str, line_user_id: str, at: datetime) -> str:
+        return "unavailable"
+
+    def pending_consents_for(self, line_user_id: str) -> list[dict[str, Any]]:
+        return []
+
+    def chart_series(
+        self, plot_id: int, line_user_id: str | None = None
+    ) -> dict[str, Any] | None:
+        return None
 
     def plot_names(self, line_user_id: str) -> list[str] | None:
         return None
@@ -179,7 +199,35 @@ class PgStore:
     def record_feedback(
         self, alert_id: int, answer: str, line_user_id: str | None, at: datetime
     ) -> FeedbackStatus:
+        """Only the plot owner or an authorised group leader may reply."""
+
         def op(c: psycopg.Connection) -> FeedbackStatus:
+            if not line_user_id:
+                return "forbidden"
+            allowed = c.execute(
+                """
+                SELECT a.id,
+                    (o.line_user_id = %(uid)s) AS is_owner,
+                    EXISTS (
+                        SELECT 1 FROM plots p2
+                        JOIN farmer_groups g ON g.id = p2.group_id
+                        JOIN users lead ON lead.id = g.leader_user_id
+                        LEFT JOIN group_members gm
+                          ON gm.group_id = g.id AND gm.user_id = p2.owner_user_id
+                        WHERE p2.id = a.plot_id AND lead.line_user_id = %(uid)s
+                          AND COALESCE(gm.leader_can_view, TRUE)
+                    ) AS is_leader
+                FROM alerts a
+                LEFT JOIN plots p ON p.id = a.plot_id
+                LEFT JOIN users o ON o.id = p.owner_user_id
+                WHERE a.id = %(alert_id)s
+                """,
+                {"uid": line_user_id, "alert_id": alert_id},
+            ).fetchone()
+            if not allowed:
+                return "not_found"
+            if not (allowed["is_owner"] or allowed["is_leader"]):
+                return "forbidden"
             row = c.execute(
                 """
                 UPDATE alerts SET feedback = %(answer)s, feedback_at = %(at)s,
@@ -283,19 +331,29 @@ class PgStore:
                 ),
             ).fetchone()["id"]
 
-            method = "assisted_pending" if reg.get("on_behalf") else "liff"
+            on_behalf = bool(reg.get("on_behalf"))
+            method = "assisted_pending" if on_behalf else "liff"
+            confirm_token = secrets.token_urlsafe(24) if on_behalf else None
             for purpose in CONSENT_PURPOSES:
+                granted = bool(reg["consents"].get(purpose))
+                # member must confirm service consent themselves (design section 6.1)
+                if on_behalf and purpose == "service":
+                    granted = False
+                confirmed_at = None if on_behalf else datetime.now(tz=UTC)
                 c.execute(
                     "INSERT INTO consents (user_id, purpose, granted, version, method,"
-                    " assisted_by, plot_id) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    " assisted_by, plot_id, confirm_token, confirmed_at)"
+                    " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (
                         owner,
                         purpose,
-                        bool(reg["consents"].get(purpose)),
+                        granted,
                         reg["consent_version"],
                         method,
-                        me if reg.get("on_behalf") else None,
+                        me if on_behalf else None,
                         plot_id,
+                        confirm_token if purpose == "service" and on_behalf else None,
+                        confirmed_at,
                     ),
                 )
             return {
@@ -304,6 +362,8 @@ class PgStore:
                 "area_rai": float(reg["area_rai"]),
                 "owner": "member" if reg.get("on_behalf") else "self",
                 "phone_stored": phone_stored,
+                "consent_token": confirm_token,
+                "consent_pending": bool(reg.get("on_behalf")),
             }
 
         return self._run_strict(op)
@@ -350,6 +410,162 @@ class PgStore:
             return out
 
         return self._run_strict(op)
+
+    def confirm_consent(self, token: str, line_user_id: str, at: datetime) -> str:
+        """Member confirms a leader-assisted registration (design section 6.1)."""
+
+        def op(c: psycopg.Connection) -> str:
+            row = c.execute(
+                """
+                SELECT c.id, c.user_id, c.plot_id, c.confirmed_at, u.line_user_id AS owner_line
+                FROM consents c
+                JOIN users u ON u.id = c.user_id
+                WHERE c.confirm_token = %s AND c.purpose = 'service'
+                """,
+                (token,),
+            ).fetchone()
+            if not row:
+                return "not_found"
+            if row["confirmed_at"] is not None:
+                return "recorded"
+            me = c.execute(
+                """
+                INSERT INTO users (line_user_id, display_name) VALUES (%s, %s)
+                ON CONFLICT (line_user_id) DO UPDATE SET display_name = users.display_name
+                RETURNING id
+                """,
+                (line_user_id, DEFAULT_DISPLAY_NAME),
+            ).fetchone()["id"]
+            if row["owner_line"] and row["owner_line"] != line_user_id:
+                return "forbidden"
+            owner_id = int(row["user_id"])
+            if not row["owner_line"]:
+                c.execute(
+                    "UPDATE plots SET owner_user_id = %s WHERE id = %s AND owner_user_id = %s",
+                    (me, row["plot_id"], owner_id),
+                )
+                c.execute(
+                    "UPDATE consents SET user_id = %s WHERE plot_id = %s AND user_id = %s",
+                    (me, row["plot_id"], owner_id),
+                )
+                owner_id = me
+            c.execute(
+                """
+                UPDATE consents SET granted = TRUE, confirmed_at = %s, method = 'line'
+                WHERE plot_id = %s AND user_id = %s AND purpose = 'service'
+                """,
+                (at, row["plot_id"], owner_id),
+            )
+            return "recorded"
+
+        return self._run(op, "unavailable")
+
+    def pending_consents_for(self, line_user_id: str) -> list[dict[str, Any]]:
+        def op(c: psycopg.Connection) -> list[dict[str, Any]]:
+            rows = c.execute(
+                """
+                SELECT c.confirm_token, c.plot_id, p.name AS plot_name, c.at,
+                       a.display_name AS assisted_by_name
+                FROM consents c
+                JOIN plots p ON p.id = c.plot_id
+                LEFT JOIN users a ON a.id = c.assisted_by
+                WHERE c.purpose = 'service' AND c.method = 'assisted_pending'
+                  AND c.confirmed_at IS NULL AND c.confirm_token IS NOT NULL
+                  AND a.line_user_id = %s
+                ORDER BY c.at DESC
+                LIMIT 20
+                """,
+                (line_user_id,),
+            )
+            return [
+                {
+                    "token": r["confirm_token"],
+                    "plot_id": int(r["plot_id"]),
+                    "plot_name": r["plot_name"],
+                    "assisted_by": r["assisted_by_name"],
+                    "at": _iso(r["at"]),
+                }
+                for r in rows
+            ]
+
+        return self._run(op, [])
+
+    def chart_series(
+        self, plot_id: int, line_user_id: str | None = None
+    ) -> dict[str, Any] | None:
+        def op(c: psycopg.Connection) -> dict[str, Any] | None:
+            plot = c.execute(
+                """
+                SELECT p.id, p.name, p.area_rai, o.line_user_id AS owner_line,
+                       r.line_user_id AS registrar_line,
+                       ST_Y(ST_Centroid(p.geom)) AS lat, ST_X(ST_Centroid(p.geom)) AS lon
+                FROM plots p
+                LEFT JOIN users o ON o.id = p.owner_user_id
+                LEFT JOIN users r ON r.id = p.registered_by
+                WHERE p.id = %s AND p.archived_at IS NULL
+                """,
+                (plot_id,),
+            ).fetchone()
+            if not plot:
+                return None
+            if not line_user_id:
+                return None
+            if line_user_id not in (plot["owner_line"], plot["registrar_line"]):
+                ok = c.execute(
+                    """
+                    SELECT 1 FROM plots p
+                    JOIN farmer_groups g ON g.id = p.group_id
+                    JOIN users lead ON lead.id = g.leader_user_id
+                    WHERE p.id = %s AND lead.line_user_id = %s
+                    """,
+                    (plot_id, line_user_id),
+                ).fetchone()
+                if not ok:
+                    return None
+            rows = c.execute(
+                """
+                SELECT obs_date, median_ndvi, ring_median, nb_median, status, gap_nb, z_nb, z_hist
+                FROM ndvi_observations
+                WHERE plot_id = %s AND is_clear AND median_ndvi IS NOT NULL
+                ORDER BY obs_date
+                """,
+                (plot_id,),
+            )
+            series = []
+            for r in rows:
+                series.append(
+                    {
+                        "date": r["obs_date"].isoformat(),
+                        "ndvi": float(r["median_ndvi"]),
+                        "neighbour": (
+                            float(r["nb_median"])
+                            if r["nb_median"] is not None
+                            else (
+                                float(r["ring_median"]) if r["ring_median"] is not None else None
+                            )
+                        ),
+                        "status": r["status"],
+                        "gap_nb": float(r["gap_nb"]) if r["gap_nb"] is not None else None,
+                        "z_nb": float(r["z_nb"]) if r["z_nb"] is not None else None,
+                        "z_hist": float(r["z_hist"]) if r["z_hist"] is not None else None,
+                    }
+                )
+            return {
+                "plot": {
+                    "id": int(plot["id"]),
+                    "name": plot["name"],
+                    "area_rai": float(plot["area_rai"]) if plot["area_rai"] is not None else None,
+                    "lat": float(plot["lat"]),
+                    "lon": float(plot["lon"]),
+                },
+                "series": series,
+            }
+
+        try:
+            return self._run_strict(op)
+        except StoreUnavailable:
+            return None
+
 
 
 def _iso(v: Any) -> str | None:

@@ -16,3 +16,14 @@ min_clear_fraction = 0.6
 inner_buffer_m = 10.0
 ring_outer_m = 2500.0
 cane_ref_window = "2025-11-20/2025-12-20"
+
+# Rain-gap / drought (design §5.2) — starting points for agronomist review
+[rain]
+dry_day_mm = 1.0
+gap_days = 14
+rain_back_3d_mm = 20.0
+sm_dry_threshold = 0.15
+require_both = true
+cooldown_days = 14
+lookback_days = 40
+season_months = [5, 6, 7, 8, 9, 10, 11]
