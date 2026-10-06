@@ -1,0 +1,18 @@
+# Example overrides: canesat --config config/thresholds.example.toml detect --all
+# Any field of canesat.config.AnomalyConfig / IngestConfig can be set; unknown keys are rejected.
+# The same anomaly fields can also be stored in the DB: settings(key='anomaly', value=JSON).
+
+[anomaly]
+gap_threshold = -0.15        # plot NDVI at least 15 % below neighbour median
+z_threshold = -2.0           # robust z-score vs neighbours
+consecutive_required = 2     # consecutive clear observations
+max_gap_days = 20            # ... no more than 20 days apart
+cooldown_days = 14           # max 1 alert / plot / type / 14 days
+min_crop_age_days = 60
+harvest_months = [12, 1, 2, 3, 4]
+
+[ingest]
+min_clear_fraction = 0.6
+inner_buffer_m = 10.0
+ring_outer_m = 2500.0
+cane_ref_window = "2025-11-20/2025-12-20"

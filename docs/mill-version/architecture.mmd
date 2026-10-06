@@ -1,0 +1,46 @@
+flowchart TB
+  subgraph SRC["แหล่งข้อมูลฟรี"]
+    direction LR
+    S2["Sentinel-2 L2A<br/>Earth Search / Planetary Computer STAC"]
+    S1["Sentinel-1 GRD/RTC"]
+    GPM["GPM IMERG<br/>NASA GES DISC"]
+    SMAP["SMAP<br/>NSIDC"]
+    FIRMS["VIIRS/MODIS<br/>NASA FIRMS"]
+  end
+
+  subgraph ING["Ingestion & Processing (Python)"]
+    SCH["Scheduler<br/>cron / Prefect"]
+    STAC["Fetchers<br/>STAC (pystac-client) · Earthdata · FIRMS API"]
+    PROC["Workers<br/>stackstac · xarray · rasterio<br/>SCL cloud mask · NDVI"]
+    ZS["Zonal stats รายแปลง"]
+    ANOM["Anomaly & Drought engine"]
+  end
+
+  subgraph STORE["Storage"]
+    PG[("PostgreSQL + PostGIS")]
+    OBJ[("Object storage<br/>COG / thumbnails")]
+  end
+
+  subgraph APP["Application"]
+    API["FastAPI backend"]
+    NOTI["Notification service<br/>queue + rate limit"]
+    TILE["Tile server<br/>TiTiler"]
+  end
+
+  subgraph UI["ผู้ใช้"]
+    direction LR
+    LOA["LINE OA<br/>Messaging API"]
+    LIFF["LINE LIFF<br/>ลงทะเบียนแปลง"]
+    DASH["Mill web dashboard"]
+  end
+
+  S2 & S1 & GPM & SMAP & FIRMS --> STAC
+  SCH --> STAC --> PROC --> ZS --> PG
+  PROC --> OBJ
+  PG --> ANOM --> PG
+  ANOM --> NOTI --> LOA
+  LIFF --> API
+  DASH --> API
+  API --> PG
+  API --> TILE --> OBJ
+  LOA -- webhook --> API

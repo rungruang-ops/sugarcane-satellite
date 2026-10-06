@@ -1,0 +1,92 @@
+# canesat -v ingest --plot-id 1 --start 2025-06-01 --end 2025-10-04 --workers 4
+{
+  "plot_id": 1,
+  "name": "Nong Ruea 1x1 km reference box",
+  "stored": 20,
+  "clear": 6,
+  "n_scenes_found": 20,
+  "n_scenes_processed": 20,
+  "n_skipped_existing": 0,
+  "n_errors": 0,
+  "cane_masks": {
+    "32648": {
+      "ref_item_id": "S2C_MSIL2A_20251201T034131_R061_T48QTD_20251201T063318",
+      "likely_cane_ring_px": 92494,
+      "ring_px": 293947
+    }
+  },
+  "plot_px": {
+    "32648": 9604
+  }
+}
+
+real	1m9.638s
+user	0m5.213s
+sys	0m0.601s
+
+# canesat -v ingest --all --start 2026-06-01 --end 2026-10-04 --workers 4
+{
+  "plot_id": 1,
+  "name": "Nong Ruea 1x1 km reference box",
+  "stored": 16,
+  "clear": 7,
+  "n_scenes_found": 16,
+  "n_scenes_processed": 16,
+  "n_skipped_existing": 0,
+  "n_errors": 0,
+  "cane_masks": {
+    "32648": {
+      "ref_item_id": "S2C_MSIL2A_20251201T034131_R061_T48QTD_20251201T063318",
+      "likely_cane_ring_px": 92494,
+      "ring_px": 293947
+    }
+  },
+  "plot_px": {
+    "32648": 9604
+  }
+}
+2026-10-04 22:53:35,134 INFO canesat.ingest: cane mask from S2C_MSIL2A_20251201T034131_R061_T48PTC_20251201T063318: ring clear 0.97, likely-cane 110082 / 293944 ring px
+{
+  "plot_id": 2,
+  "name": "Mancha Khiri 1x1 km reference box",
+  "stored": 17,
+  "clear": 3,
+  "n_scenes_found": 17,
+  "n_scenes_processed": 17,
+  "n_skipped_existing": 0,
+  "n_errors": 0,
+  "cane_masks": {
+    "32648": {
+      "ref_item_id": "S2C_MSIL2A_20251201T034131_R061_T48PTC_20251201T063318",
+      "likely_cane_ring_px": 110082,
+      "ring_px": 293944
+    }
+  },
+  "plot_px": {
+    "32648": 9604
+  }
+}
+
+real	1m13.366s
+user	0m8.002s
+sys	0m0.615s
+
+# canesat detect --all
+{
+  "plots": {
+    "1": {
+      "n_clear_obs": 13,
+      "status_counts": {
+        "normal": 13
+      },
+      "new_alert_ids": []
+    },
+    "2": {
+      "n_clear_obs": 3,
+      "status_counts": {
+        "normal": 3
+      },
+      "new_alert_ids": []
+    }
+  }
+}

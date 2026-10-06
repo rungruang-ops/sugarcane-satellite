@@ -1,0 +1,43 @@
+flowchart TB
+  subgraph SRC["ข้อมูลดาวเทียมฟรี"]
+    direction LR
+    S2["Sentinel-2 L2A<br/>Planetary Computer / Earth Search STAC"]
+    GPM["GPM IMERG<br/>ฝนรายวัน"]
+    SMAP["SMAP<br/>ความชื้นดิน"]
+  end
+
+  subgraph JOB["งานตามเวลา (Python, cron บน VM เดียว)"]
+    direction LR
+    F["fetch<br/>pystac-client · rasterio"]
+    P["NDVI + SCL mask<br/>zonal stats รายแปลง"]
+    R["alert rules<br/>เพื่อนบ้าน · ปีก่อน · ฝน"]
+    Q["notify<br/>โควตา 300/เดือน · quiet hours"]
+  end
+
+  DB[("PostgreSQL + PostGIS<br/>แปลง · time series · alert · consent")]
+  OBJ[("ไฟล์ภาพ PNG/COG<br/>ดิสก์ VM หรือ object storage")]
+
+  subgraph APP["FastAPI (container เดียว)"]
+    API["REST API + LINE webhook"]
+  end
+
+  subgraph LINE["LINE"]
+    direction LR
+    OA["LINE OA<br/>แชท + Rich menu"]
+    LIFF["LIFF<br/>ลงทะเบียน · หน้าแปลง · กลุ่ม"]
+  end
+
+  U1(["ชาวไร่"])
+  U2(["หัวหน้ากลุ่ม"])
+
+  S2 & GPM & SMAP --> F --> P --> DB
+  P --> OBJ
+  DB --> R --> DB
+  R --> Q --> OA
+  OA -- webhook --> API
+  LIFF --> API --> DB
+  API --> OBJ
+  U1 --- OA
+  U1 --- LIFF
+  U2 --- LIFF
+  U2 --- OA
