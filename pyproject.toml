@@ -30,9 +30,6 @@ canesat = "canesat.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/canesat"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"src/canesat/migrations" = "canesat/migrations"
-
 [tool.ruff]
 line-length = 100
 target-version = "py311"
