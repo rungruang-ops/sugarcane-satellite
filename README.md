@@ -3,7 +3,8 @@
 ระบบแจ้งเตือนจากดาวเทียมสำหรับชาวไร่อ้อยผ่าน LINE — โครงการนำร่อง จ.ขอนแก่น (อ.หนองเรือ / อ.มัญจาคีรี)
 Satellite-based alerts for sugarcane farmers via LINE — pilot in Khon Kaen, Thailand.
 
-> **สถานะ / Status:** Milestone 1 — NDVI pipeline + anomaly engine (ยังไม่มี LINE / LIFF).
+> **สถานะ / Status:** Milestone 1 — NDVI pipeline + anomaly engine · Milestone 2 (in progress) —
+> LINE webhook for the **เบิ่งไฮ่** bot ([`docs/line-webhook.md`](docs/line-webhook.md)); no LIFF yet.
 > Design: [`docs/design.md`](docs/design.md) (Thai, farmer-only version) ·
 > mill version: [`docs/mill-version/design.md`](docs/mill-version/design.md)
 
@@ -125,8 +126,10 @@ Reproduce with `scripts/e2e_nong_ruea.sh`.
 Following [`docs/design.md`](docs/design.md) §16:
 1. ✅ **Milestone 1 (this):** scaffold, PostGIS schema, Sentinel-2 ingestion, neighbour & prior-year
    baselines, anomaly engine, CLI, tests, CI.
-2. **LINE OA webhook** (FastAPI, `X-Line-Signature` check), Flex Message alerts + feedback
-   postbacks → `alerts.feedback`, push quota counter (300/month free tier), quiet hours.
+2. 🚧 **LINE OA webhook** — done: FastAPI `/callback` (`X-Line-Signature` check), follow/unfollow →
+   `users`, keyword replies, feedback postbacks → `alerts.feedback`, Flex alert builder, Rich Menu
+   spec ([`docs/line-webhook.md`](docs/line-webhook.md)). Todo: notify job with push quota counter
+   (300/month free tier) and quiet hours.
 3. **LIFF**: plot registration (draw / GPS walk), plot page (F3: plot vs neighbours vs last year),
    group page for leaders, PDPA consent flows (design §6) → `consent`, `audit_log` tables.
 4. **GPM IMERG + SMAP drought / rain-back alerts** (F2) — needs a NASA **Earthdata login**
