@@ -28,9 +28,7 @@ class RainAlert:
     details: dict[str, Any] = field(default_factory=dict)
 
 
-def consecutive_dry_ending(
-    series: Sequence[DayWeather], end: date, dry_day_mm: float
-) -> int:
+def consecutive_dry_ending(series: Sequence[DayWeather], end: date, dry_day_mm: float) -> int:
     """Count consecutive dry days ending on ``end`` (missing precip breaks the streak)."""
     by_date = {d.obs_date: d for d in series}
     streak = 0
@@ -143,23 +141,21 @@ def detect_rain_series(
         p3 = precip_sum(ordered, as_of - timedelta(days=2), as_of)
         if p3 is not None and p3 >= cfg.rain_back_3d_mm:
             alerts.append(
-                    RainAlert(
-                        type="rain_back",
-                        severity="orange",
-                        obs_date=as_of,
-                        precip_3d_mm=p3,
-                        soil_moisture=sm,
-                        details={
-                            "precip_3d_mm": p3,
-                            "rain_back_3d_mm": cfg.rain_back_3d_mm,
-                            "prior_gap_date": last_gap_any.isoformat(),
-                            "guidance": (
-                                "ดินน่าจะชื้นพอ — ถ้าวางแผนใส่ปุ๋ยไว้ ช่วงนี้เป็นจังหวะที่ดี"
-                            ),
-                            "thresholds": cfg.to_dict(),
-                        },
-                    )
+                RainAlert(
+                    type="rain_back",
+                    severity="orange",
+                    obs_date=as_of,
+                    precip_3d_mm=p3,
+                    soil_moisture=sm,
+                    details={
+                        "precip_3d_mm": p3,
+                        "rain_back_3d_mm": cfg.rain_back_3d_mm,
+                        "prior_gap_date": last_gap_any.isoformat(),
+                        "guidance": ("ดินน่าจะชื้นพอ — ถ้าวางแผนใส่ปุ๋ยไว้ ช่วงนี้เป็นจังหวะที่ดี"),
+                        "thresholds": cfg.to_dict(),
+                    },
                 )
+            )
     return alerts
 
 

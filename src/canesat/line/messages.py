@@ -198,7 +198,7 @@ def compare_neighbours(chart_url: str | None = None) -> list[Message]:
         "📊 เทียบเพื่อนบ้าน & ปีที่แล้ว\n"
         "เมื่อลงทะเบียนแปลงแล้ว จะเห็นกราฟ 3 เส้น: แปลงของคุณปีนี้, แปลงรอบ ๆ ปีนี้ "
         "และแปลงของคุณปีที่แล้ว พร้อมบอกว่า ปกติ / เฝ้าระวัง / ควรไปดู\n"
-        "พิมพ์ \"แปลงของฉัน\" แล้วเปิดหน้ากราฟจากรายการแปลงได้ครับ"
+        'พิมพ์ "แปลงของฉัน" แล้วเปิดหน้ากราฟจากรายการแปลงได้ครับ'
     )
     return [text(body)]
 
@@ -271,12 +271,7 @@ def non_text_received() -> list[Message]:
 def feedback_thanks(answer: str, status: str) -> list[Message]:
     label = FEEDBACK_CHOICES.get(answer, answer)
     if status == "forbidden":
-        return [
-            text(
-                "ขออภัยครับ ปุ่มตอบนี้ใช้ได้เฉพาะเจ้าของแปลง"
-                "หรือหัวหน้ากลุ่มที่ได้รับการยินยอมเท่านั้น"
-            )
-        ]
+        return [text("ขออภัยครับ ปุ่มตอบนี้ใช้ได้เฉพาะเจ้าของแปลงหรือหัวหน้ากลุ่มที่ได้รับการยินยอมเท่านั้น")]
     if answer == "no_problem":
         body = f"✅ ดีใจด้วยครับ บันทึกว่า {label} แล้ว\nขอบคุณที่ไปดูแปลง ช่วยให้{BOT_NAME}แม่นขึ้นครับ"
     else:
@@ -306,7 +301,7 @@ def consent_confirm_prompt(plot_name: str, token_url: str) -> list[Message]:
 
 def consent_confirmed(plot_name: str | None = None) -> list[Message]:
     who = f'แปลง "{plot_name}"' if plot_name else "แปลงของคุณ"
-    return [text(f"✅ บันทึกความยินยอมแล้วครับ {who}พร้อมใช้งาน\nพิมพ์ \"แปลงของฉัน\" เพื่อดูรายการแปลง")]
+    return [text(f'✅ บันทึกความยินยอมแล้วครับ {who}พร้อมใช้งาน\nพิมพ์ "แปลงของฉัน" เพื่อดูรายการแปลง')]
 
 
 def rain_report_thanks(answer: str) -> list[Message]:

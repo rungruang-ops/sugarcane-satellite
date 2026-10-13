@@ -69,7 +69,10 @@ def _short(uid: str | None) -> str:
 
 class EventRouter:
     def __init__(
-        self, line: LineApi, store: Store | None = None, liff_url: str | None = None,
+        self,
+        line: LineApi,
+        store: Store | None = None,
+        liff_url: str | None = None,
         public_base_url: str | None = None,
     ) -> None:
         self.line = line
@@ -132,8 +135,10 @@ class EventRouter:
             uid = _user_id(event)
             return m.my_plots(self.store.plot_names(uid) if uid else None, self.liff_url)
         if intent == "compare":
-            chart = f"{self.public_base_url}/liff/chart" if self.public_base_url else (
-                f"{self.liff_url}?view=chart" if self.liff_url else None
+            chart = (
+                f"{self.public_base_url}/liff/chart"
+                if self.public_base_url
+                else (f"{self.liff_url}?view=chart" if self.liff_url else None)
             )
             return m.compare_neighbours(chart)
         if intent == "add_plot":

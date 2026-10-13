@@ -69,6 +69,7 @@ compares each plot with its neighbours and with its own prior years, and creates
 | `src/canesat/detect.py` | runs the engine over stored observations, writes statuses + alerts |
 | `src/canesat/db.py`, `migrations/` | psycopg 3 data access + plain-SQL migrations |
 | `src/canesat/cli.py` | `canesat` CLI |
+| `src/canesat/scheduler.py` | periodic jobs: `s2_fetch`, `ndvi_rules`, `rain_check`, `notify` (`python -m canesat.scheduler`) |
 | `docs/` | design docs, mockups, architecture, exploratory Khon Kaen NDVI work |
 
 ### Data model (`src/canesat/migrations/0001_init.sql`)
@@ -129,11 +130,14 @@ Following [`docs/design.md`](docs/design.md) §16:
    baselines, anomaly engine, CLI, tests, CI.
 2. 🚧 **LINE OA webhook** — done: FastAPI `/callback` (`X-Line-Signature` check), follow/unfollow →
    `users`, keyword replies, feedback postbacks → `alerts.feedback`, Flex alert builder, Rich Menu
-   spec ([`docs/line-webhook.md`](docs/line-webhook.md)). Todo: notify job with push quota counter
-   (300/month free tier) and quiet hours.
+   spec ([`docs/line-webhook.md`](docs/line-webhook.md)). Notify job with a push quota counter
+   (300/month free tier, soft cap 280) and quiet hours (push only 06:00–19:00 Asia/Bangkok, see
+   [`docs/jobs.md`](docs/jobs.md)). Run automatically by the scheduler (`canesat.scheduler`, [`docs/jobs.md`](docs/jobs.md)).
 3. 🚧 **LIFF**: ✅ plot registration, ✅ comparison chart (`/liff/chart`), ✅ member consent confirm
    (`/liff/consent`); group page for leaders still open.
 4. ✅ **GPM IMERG + SMAP drought / rain-back alerts** (F2) — `canesat rain-check` + gated
    `canesat notify` (`ENABLE_PUSH_ALERTS=false` by default). See [`docs/jobs.md`](docs/jobs.md).
-5. Scheduler (cron in Docker: `s2_fetch` every 12 h, `backfill_plot` on registration,
-   `cane_mask_refresh` yearly), monitoring, Earth Search fallback STAC.
+5. 🚧 **Scheduler** — done: `python -m canesat.scheduler` runs `s2_fetch` (every 12 h), `ndvi_rules`
+   (after each `s2_fetch`), `rain_check` (daily) and `notify` (every 30 min, only when push is
+   already enabled), with a `job_runs` log ([`docs/jobs.md`](docs/jobs.md)). Todo: `backfill_plot` on
+   registration, `cane_mask_refresh` yearly, monitoring, Earth Search fallback STAC.

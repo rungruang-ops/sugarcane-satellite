@@ -379,7 +379,6 @@ def preview_cmd(c: Ctx, center, size_m, start, end, workers, out) -> None:
     click.echo(text if not out else f"wrote {out}")
 
 
-
 # ------------------------------------------------------------------ weather / notify
 @main.command("rain-check")
 @click.option("--plot-id", "plot_ids", type=int, multiple=True)
@@ -457,10 +456,17 @@ def rain_check_cmd(c: Ctx, plot_ids, all_plots, as_of, no_soil, fixture_rain, fi
 
 
 @main.command("notify")
-@click.option("--enable-push/--dry-run", default=None,
-              help="Override ENABLE_PUSH_ALERTS for this run. Default = env (off).")
-@click.option("--type", "types", multiple=True,
-              type=click.Choice(["greenness", "rain_gap", "rain_back", "harvest_check"]))
+@click.option(
+    "--enable-push/--dry-run",
+    default=None,
+    help="Override ENABLE_PUSH_ALERTS for this run. Default = env (off).",
+)
+@click.option(
+    "--type",
+    "types",
+    multiple=True,
+    type=click.Choice(["greenness", "rain_gap", "rain_back", "harvest_check"]),
+)
 @click.pass_obj
 def notify_cmd(c: Ctx, enable_push, types) -> None:
     """Deliver pending alerts: dry-run by default; real push only if ENABLE_PUSH_ALERTS=true.
@@ -522,10 +528,50 @@ def anomaly_notify_cmd(c: Ctx, plot_ids, all_plots, enable_push) -> None:
         if public and not public.startswith("http"):
             public = "https://" + public
         notify_report = notify_mod.deliver_pending(
-            conn, push, enable_push=enabled, types=["greenness", "harvest_check"],
+            conn,
+            push,
+            enable_push=enabled,
+            types=["greenness", "harvest_check"],
             graph_base_url=public,
         )
     click.echo(_dump({"detect": detect_summary, "notify": notify_report}))
+
+
+# ------------------------------------------------------------------ scheduler
+@main.group("schedule")
+def schedule_group() -> None:
+    """Periodic jobs (s2_fetch, ndvi_rules, rain_check, notify) — see canesat.scheduler."""
+
+
+@schedule_group.command("run")
+@click.option("--once", is_flag=True, help="Run one pass (whatever is due) and exit.")
+@click.option(
+    "--poll-s", type=float, default=60.0, show_default=True, help="Seconds between passes."
+)
+@click.pass_obj
+def schedule_run(c: Ctx, once: bool, poll_s: float) -> None:
+    """Run due jobs now (--once) or keep running them. Never turns push on by itself."""
+    from . import scheduler
+
+    if not c.settings.database_url:
+        raise click.UsageError("DATABASE_URL is not set (see .env.example)")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        stream=sys.stdout,
+        force=True,
+    )
+    scheduler.run(c.settings.database_url, once=once, poll_s=poll_s)
+
+
+@schedule_group.command("status")
+@click.pass_obj
+def schedule_status(c: Ctx) -> None:
+    """Show each job's last attempt and whether it is due, waiting or blocked."""
+    from . import scheduler
+
+    with c.conn() as conn:
+        click.echo(_dump(scheduler.describe(scheduler.PgStore(conn))))
 
 
 if __name__ == "__main__":

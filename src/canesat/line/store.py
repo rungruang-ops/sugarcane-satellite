@@ -82,9 +82,7 @@ class NullStore:
     def pending_consents_for(self, line_user_id: str) -> list[dict[str, Any]]:
         return []
 
-    def chart_series(
-        self, plot_id: int, line_user_id: str | None = None
-    ) -> dict[str, Any] | None:
+    def chart_series(self, plot_id: int, line_user_id: str | None = None) -> dict[str, Any] | None:
         return None
 
     def plot_names(self, line_user_id: str) -> list[str] | None:
@@ -490,9 +488,7 @@ class PgStore:
 
         return self._run(op, [])
 
-    def chart_series(
-        self, plot_id: int, line_user_id: str | None = None
-    ) -> dict[str, Any] | None:
+    def chart_series(self, plot_id: int, line_user_id: str | None = None) -> dict[str, Any] | None:
         def op(c: psycopg.Connection) -> dict[str, Any] | None:
             plot = c.execute(
                 """
@@ -540,9 +536,7 @@ class PgStore:
                         "neighbour": (
                             float(r["nb_median"])
                             if r["nb_median"] is not None
-                            else (
-                                float(r["ring_median"]) if r["ring_median"] is not None else None
-                            )
+                            else (float(r["ring_median"]) if r["ring_median"] is not None else None)
                         ),
                         "status": r["status"],
                         "gap_nb": float(r["gap_nb"]) if r["gap_nb"] is not None else None,
@@ -565,7 +559,6 @@ class PgStore:
             return self._run_strict(op)
         except StoreUnavailable:
             return None
-
 
 
 def _iso(v: Any) -> str | None:

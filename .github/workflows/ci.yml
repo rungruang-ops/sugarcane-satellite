@@ -45,3 +45,28 @@ jobs:
         run: ruff format --check .
       - name: Pytest (network tests are skipped by default)
         run: pytest
+      - name: Build package
+        run: |
+          python -m pip install build
+          python -m build --wheel --sdist
+      - name: Wheel ships migrations and LIFF static files
+        run: |
+          python - <<'PY'
+          import glob, pathlib, zipfile
+
+          (wheel,) = glob.glob("dist/*.whl")
+          names = zipfile.ZipFile(wheel).namelist()
+          required = [
+              f"canesat/migrations/{p.name}"
+              for p in pathlib.Path("src/canesat/migrations").glob("*.sql")
+          ]
+          assert required, "no migrations found in the source tree"
+          required += [
+              "canesat/line/static/register.html",
+              "canesat/line/static/chart.html",
+              "canesat/line/static/consent.html",
+          ]
+          missing = [n for n in required if n not in names]
+          assert not missing, f"missing from wheel: {missing}"
+          print("wheel contents OK:", len(names), "files")
+          PY

@@ -34,8 +34,9 @@ class LineSettings:
     # Push alerts OFF by default (LINE OA Free = 300 msgs/month). Never enable on Railway
     # without an explicit Sam yes.
     enable_push_alerts: bool = field(
-        default_factory=lambda: (_env("ENABLE_PUSH_ALERTS") or "false").lower()
-        in ("1", "true", "yes", "on")
+        default_factory=lambda: (
+            (_env("ENABLE_PUSH_ALERTS") or "false").lower() in ("1", "true", "yes", "on")
+        )
     )
 
     @property
