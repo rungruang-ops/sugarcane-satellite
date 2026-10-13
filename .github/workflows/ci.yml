@@ -49,3 +49,20 @@ jobs:
         run: |
           python -m pip install build
           python -m build --wheel --sdist
+      - name: Wheel ships migrations and LIFF static files
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+
+          (wheel,) = glob.glob("dist/*.whl")
+          names = zipfile.ZipFile(wheel).namelist()
+          required = [
+              "canesat/migrations/0001_init.sql",
+              "canesat/line/static/register.html",
+              "canesat/line/static/chart.html",
+              "canesat/line/static/consent.html",
+          ]
+          missing = [n for n in required if n not in names]
+          assert not missing, f"missing from wheel: {missing}"
+          print("wheel contents OK:", len(names), "files")
+          PY
