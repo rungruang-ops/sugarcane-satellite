@@ -52,12 +52,16 @@ jobs:
       - name: Wheel ships migrations and LIFF static files
         run: |
           python - <<'PY'
-          import glob, zipfile
+          import glob, pathlib, zipfile
 
           (wheel,) = glob.glob("dist/*.whl")
           names = zipfile.ZipFile(wheel).namelist()
           required = [
-              "canesat/migrations/0001_init.sql",
+              f"canesat/migrations/{p.name}"
+              for p in pathlib.Path("src/canesat/migrations").glob("*.sql")
+          ]
+          assert required, "no migrations found in the source tree"
+          required += [
               "canesat/line/static/register.html",
               "canesat/line/static/chart.html",
               "canesat/line/static/consent.html",

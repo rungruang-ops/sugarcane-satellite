@@ -3,6 +3,41 @@
 Push alerts are **off by default**. `ENABLE_PUSH_ALERTS` must stay `false` on Railway
 until Sam explicitly says yes (LINE OA Free plan = 300 messages/month).
 
+## Scheduler (`python -m canesat.scheduler`)
+
+Runs the jobs below automatically (design §9.3) as a second Railway service
+([`docs/railway.md`](railway.md)). Each job is the existing CLI command run in a subprocess, so
+behaviour is identical to running it by hand.
+
+| Job | When | Command | Skipped ("blocked") while |
+|---|---|---|---|
+| `s2_fetch` | every 12 h | `ingest --all --start <today-14d> --end <today>` (stored scenes are skipped) | — |
+| `ndvi_rules` | once after each successful `s2_fetch` | `detect --all` | no successful `s2_fetch` yet |
+| `rain_check` | once per day from 08:00 Asia/Bangkok | `rain-check --all` | `EARTHDATA_TOKEN` is unset |
+| `notify` | every 30 min | `notify` | `ENABLE_PUSH_ALERTS` is off, or outside the send window (06:00–19:00) |
+
+* **Push stays opt-in.** The scheduler never turns push on and never passes `--enable-push`;
+  `notify` only runs when `ENABLE_PUSH_ALERTS` is already `true`, and the command itself still applies
+  quiet hours and the monthly quota. (Running `notify` as a dry run every 30 min would only pile up
+  `dry_run` rows, so it is not scheduled while push is off.)
+* **Failures** are retried 30 min later, at most 4 attempts per cycle (per day for `rain_check`, per
+  `s2_fetch` result for `ndvi_rules`), then the job waits for its next normal slot.
+* **No double runs.** What is due comes from the `job_runs` table, so restarts and redeploys don't
+  repeat a job that just ran; a Postgres advisory lock keeps two scheduler instances from working at
+  once. A run left `running` by a crash is marked `abandoned` and the job runs again.
+* `job_runs.detail` keeps the last 2000 characters of a job's output (known secrets are masked).
+
+```bash
+canesat schedule status          # last attempt + due / waiting / blocked per job
+canesat schedule run --once      # run whatever is due right now, then exit
+canesat schedule run             # same loop as the service (--poll-s, default 60)
+```
+
+The service itself reads `SCHEDULER_POLL_S` (seconds between passes, default 60).
+
+Not scheduled yet: `backfill_plot` (new plots still get a 92-day background ingest from the LIFF
+registration) and `cane_mask_refresh` (yearly).
+
 ## Rain-gap / drought (`canesat rain-check`)
 
 Fetches GPM IMERG Late daily rain + SMAP SPL3SMP_E soil moisture for registered plot

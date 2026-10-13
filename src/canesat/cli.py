@@ -537,5 +537,42 @@ def anomaly_notify_cmd(c: Ctx, plot_ids, all_plots, enable_push) -> None:
     click.echo(_dump({"detect": detect_summary, "notify": notify_report}))
 
 
+# ------------------------------------------------------------------ scheduler
+@main.group("schedule")
+def schedule_group() -> None:
+    """Periodic jobs (s2_fetch, ndvi_rules, rain_check, notify) — see canesat.scheduler."""
+
+
+@schedule_group.command("run")
+@click.option("--once", is_flag=True, help="Run one pass (whatever is due) and exit.")
+@click.option(
+    "--poll-s", type=float, default=60.0, show_default=True, help="Seconds between passes."
+)
+@click.pass_obj
+def schedule_run(c: Ctx, once: bool, poll_s: float) -> None:
+    """Run due jobs now (--once) or keep running them. Never turns push on by itself."""
+    from . import scheduler
+
+    if not c.settings.database_url:
+        raise click.UsageError("DATABASE_URL is not set (see .env.example)")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        stream=sys.stdout,
+        force=True,
+    )
+    scheduler.run(c.settings.database_url, once=once, poll_s=poll_s)
+
+
+@schedule_group.command("status")
+@click.pass_obj
+def schedule_status(c: Ctx) -> None:
+    """Show each job's last attempt and whether it is due, waiting or blocked."""
+    from . import scheduler
+
+    with c.conn() as conn:
+        click.echo(_dump(scheduler.describe(scheduler.PgStore(conn))))
+
+
 if __name__ == "__main__":
     main()

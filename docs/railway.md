@@ -27,6 +27,23 @@ Never commit secret values; set them as Railway service variables.
 
 Jobs (rain-check / anomaly-notify / notify): see [`docs/jobs.md`](jobs.md).
 
+## Scheduler service
+
+The periodic jobs ([`docs/jobs.md`](jobs.md)) run as a **second service from the same repo**:
+
+1. New service → same GitHub repo, same branch.
+2. Settings → *Config as Code* → file path `/railway.scheduler.json` (build is the same
+   `Dockerfile`; start command `python -m canesat.scheduler`; no HTTP health check, since it serves
+   nothing).
+3. Variables: `DATABASE_URL`, plus the ones the jobs need — `EARTHDATA_TOKEN` (otherwise `rain_check`
+   is skipped), `LINE_CHANNEL_ACCESS_TOKEN`, `PUBLIC_BASE_URL`, and `ENABLE_PUSH_ALERTS`
+   (**`false`** — while it is off, `notify` is not scheduled at all). Optional `SCHEDULER_POLL_S`.
+4. Run **one** replica. A second one is harmless (an advisory lock makes it wait) but pointless.
+
+The scheduler applies migrations on start like the webhook does. On the very first deploy, start
+the webhook service first: if both apply migrations at the same moment one of them may crash once
+and recover on Railway's automatic restart.
+
 ## Redeploy
 
 ```bash
