@@ -183,14 +183,24 @@ def deliver_pending(
             }
             if not enable or push is None:
                 _record_delivery(
-                    conn, alert["id"], user["id"], "dry_run", "skipped", month,
+                    conn,
+                    alert["id"],
+                    user["id"],
+                    "dry_run",
+                    "skipped",
+                    month,
                     {"reason": "push_disabled"},
                 )
                 report["dry_run"].append(entry)
                 continue
             if used >= monthly_quota:
                 _record_delivery(
-                    conn, alert["id"], user["id"], "push", "skipped", month,
+                    conn,
+                    alert["id"],
+                    user["id"],
+                    "push",
+                    "skipped",
+                    month,
                     {"reason": "quota"},
                 )
                 report["skipped"].append({**entry, "reason": "quota"})
@@ -205,14 +215,10 @@ def deliver_pending(
                 used += 1
                 report["delivered"].append(entry)
             else:
-                _record_delivery(
-                    conn, alert["id"], user["id"], "push", "failed", month, {}
-                )
+                _record_delivery(conn, alert["id"], user["id"], "push", "failed", month, {})
                 report["skipped"].append({**entry, "reason": "push_failed"})
         # mark pending→suppressed dry-run path: leave as pending so a later enable can send
-        if enable and recipients and any(
-            d["alert_id"] == alert["id"] for d in report["delivered"]
-        ):
+        if enable and recipients and any(d["alert_id"] == alert["id"] for d in report["delivered"]):
             pass
         elif not enable:
             # keep status=pending; dry_run only

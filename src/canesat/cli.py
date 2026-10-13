@@ -379,7 +379,6 @@ def preview_cmd(c: Ctx, center, size_m, start, end, workers, out) -> None:
     click.echo(text if not out else f"wrote {out}")
 
 
-
 # ------------------------------------------------------------------ weather / notify
 @main.command("rain-check")
 @click.option("--plot-id", "plot_ids", type=int, multiple=True)
@@ -457,10 +456,17 @@ def rain_check_cmd(c: Ctx, plot_ids, all_plots, as_of, no_soil, fixture_rain, fi
 
 
 @main.command("notify")
-@click.option("--enable-push/--dry-run", default=None,
-              help="Override ENABLE_PUSH_ALERTS for this run. Default = env (off).")
-@click.option("--type", "types", multiple=True,
-              type=click.Choice(["greenness", "rain_gap", "rain_back", "harvest_check"]))
+@click.option(
+    "--enable-push/--dry-run",
+    default=None,
+    help="Override ENABLE_PUSH_ALERTS for this run. Default = env (off).",
+)
+@click.option(
+    "--type",
+    "types",
+    multiple=True,
+    type=click.Choice(["greenness", "rain_gap", "rain_back", "harvest_check"]),
+)
 @click.pass_obj
 def notify_cmd(c: Ctx, enable_push, types) -> None:
     """Deliver pending alerts: dry-run by default; real push only if ENABLE_PUSH_ALERTS=true.
@@ -522,7 +528,10 @@ def anomaly_notify_cmd(c: Ctx, plot_ids, all_plots, enable_push) -> None:
         if public and not public.startswith("http"):
             public = "https://" + public
         notify_report = notify_mod.deliver_pending(
-            conn, push, enable_push=enabled, types=["greenness", "harvest_check"],
+            conn,
+            push,
+            enable_push=enabled,
+            types=["greenness", "harvest_check"],
             graph_base_url=public,
         )
     click.echo(_dump({"detect": detect_summary, "notify": notify_report}))

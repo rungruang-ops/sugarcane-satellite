@@ -1,6 +1,5 @@
 """Notify job: dry-run by default, push only when enabled."""
 
-
 from canesat.notify import push_alerts_enabled
 
 

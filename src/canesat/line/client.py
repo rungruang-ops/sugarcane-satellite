@@ -53,7 +53,6 @@ class LineClient:
             log.info("profile lookup failed: HTTP %s", exc.status)
             return None
 
-
     def push(self, user_id: str, messages: list[dict[str, Any]]) -> bool:
         """Push a message. Caller must check ENABLE_PUSH_ALERTS before invoking."""
         req = PushMessageRequest.from_dict({"to": user_id, "messages": messages})

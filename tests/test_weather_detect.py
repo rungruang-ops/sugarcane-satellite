@@ -21,7 +21,9 @@ def test_consecutive_dry_streak():
 
 def test_rain_gap_requires_dry_days_and_low_soil():
     cfg = RainConfig(
-        gap_days=14, require_both=True, sm_dry_threshold=0.15,
+        gap_days=14,
+        require_both=True,
+        sm_dry_threshold=0.15,
         season_months=tuple(range(1, 13)),
     )
     dry = _series([0.2] * 16, sm=0.10)
@@ -41,7 +43,9 @@ def test_rain_gap_without_require_both():
 
 def test_rain_gap_cooldown():
     cfg = RainConfig(
-        gap_days=14, require_both=False, cooldown_days=14,
+        gap_days=14,
+        require_both=False,
+        cooldown_days=14,
         season_months=tuple(range(1, 13)),
     )
     dry = _series([0.0] * 30)  # Sep 1 .. Sep 30

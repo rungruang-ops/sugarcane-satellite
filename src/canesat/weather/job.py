@@ -54,8 +54,7 @@ def run_weather_check(
             cell_sm[(lat, lon)] = soil.daily_soil_moisture(lat, lon, start, as_of)
         else:
             cell_sm[(lat, lon)] = {
-                start + timedelta(days=i): (None, None)
-                for i in range((as_of - start).days + 1)
+                start + timedelta(days=i): (None, None) for i in range((as_of - start).days + 1)
             }
 
     with conn.transaction():
