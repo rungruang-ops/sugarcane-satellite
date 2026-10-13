@@ -21,6 +21,43 @@ BANGKOK = ZoneInfo("Asia/Bangkok")
 
 ALERT_PRIORITY = {"greenness": 0, "rain_gap": 1, "rain_back": 2, "harvest_check": 3}
 
+# Quiet hours (design §9.3: notify runs 06:00-19:00). Pushes are only sent when the local
+# (Asia/Bangkok) hour is in [start, end); outside the window alerts stay `pending` and are sent
+# by the first run inside the next window. Dry runs are not gated (they send nothing).
+DEFAULT_SEND_START_HOUR = 6
+DEFAULT_SEND_END_HOUR = 19
+
+
+def send_window() -> tuple[int, int]:
+    """(start_hour, end_hour) from PUSH_WINDOW_START_HOUR / PUSH_WINDOW_END_HOUR.
+
+    Invalid values fall back to the 06-19 default: a bad setting must never turn into
+    night-time pushes to farmers.
+    """
+    default = (DEFAULT_SEND_START_HOUR, DEFAULT_SEND_END_HOUR)
+    try:
+        start = int(os.environ.get("PUSH_WINDOW_START_HOUR", default[0]))
+        end = int(os.environ.get("PUSH_WINDOW_END_HOUR", default[1]))
+    except ValueError:
+        log.warning("PUSH_WINDOW_*_HOUR is not an integer; using %02d-%02d", *default)
+        return default
+    if not 0 <= start < end <= 24:
+        log.warning("PUSH_WINDOW_* must satisfy 0 <= start < end <= 24; using %02d-%02d", *default)
+        return default
+    return start, end
+
+
+def within_send_window(now: datetime | None = None, window: tuple[int, int] | None = None) -> bool:
+    """True if `now` (naive = already Asia/Bangkok, aware = converted) is inside the window."""
+    start, end = window or send_window()
+    if now is None:
+        now = datetime.now(tz=BANGKOK)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=BANGKOK)
+    else:
+        now = now.astimezone(BANGKOK)
+    return start <= now.hour < end
+
 
 def push_alerts_enabled() -> bool:
     return (os.environ.get("ENABLE_PUSH_ALERTS") or "false").strip().lower() in (
@@ -149,20 +186,34 @@ def deliver_pending(
     monthly_quota: int = 280,
     types: list[str] | None = None,
     graph_base_url: str | None = None,
+    now: datetime | None = None,
+    window: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
-    """Process pending alerts. When push is disabled, write dry_run deliveries only."""
+    """Process pending alerts. When push is disabled, write dry_run deliveries only.
+
+    With push enabled, nothing is sent outside the quiet-hours window (see `send_window`);
+    pending alerts are left untouched so the next in-window run delivers them.
+    """
     enable = push_alerts_enabled() if enable_push is None else enable_push
-    month = quota_month()
+    start_hour, end_hour = window or send_window()
+    in_window = within_send_window(now, (start_hour, end_hour))
+    month = quota_month(now.astimezone(BANGKOK) if now and now.tzinfo else now)
     used = count_pushes_this_month(conn, month)
     report: dict[str, Any] = {
         "enable_push_alerts": enable,
         "quota_month": month,
         "pushes_used": used,
         "monthly_quota": monthly_quota,
+        "send_window": f"{start_hour:02d}:00-{end_hour:02d}:00 Asia/Bangkok",
+        "in_send_window": in_window,
         "delivered": [],
         "dry_run": [],
         "skipped": [],
+        "deferred": 0,
     }
+    if enable and push is not None and not in_window:
+        report["deferred"] = len(pending_alerts(conn, types=types))
+        return report
     alerts = pending_alerts(conn, types=types)
     for alert in alerts:
         recipients = recipients_for_alert(conn, alert)

@@ -40,6 +40,22 @@ canesat notify --dry-run              # default; writes alert_deliveries kind=dr
 ENABLE_PUSH_ALERTS=true canesat notify --enable-push
 ```
 
+### Quiet hours
+
+With push enabled, `notify` only sends when the Asia/Bangkok hour is in `[START, END)`
+(default **06:00–19:00**, design §9.3). Outside the window it sends nothing and writes nothing:
+pending alerts stay `pending`, the report shows `"in_send_window": false` and a `deferred`
+count, and the first run inside the next window delivers them (priority order is unchanged).
+Dry runs are not gated.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PUSH_WINDOW_START_HOUR` | `6` | first hour (inclusive) pushes may go out |
+| `PUSH_WINDOW_END_HOUR` | `19` | hour (exclusive) pushes stop; `24` = until midnight |
+
+Invalid values (non-integer, `start >= end`, outside 0–24) fall back to 06–19 with a log
+warning, so a typo can never turn into night-time pushes.
+
 How Sam turns push on later:
 1. Confirm LINE OA Free quota headroom (or upgrade plan).
 2. Set Railway variable `ENABLE_PUSH_ALERTS=true` on `bernghai-bot` (or run the CLI with

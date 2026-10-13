@@ -129,8 +129,9 @@ Following [`docs/design.md`](docs/design.md) §16:
    baselines, anomaly engine, CLI, tests, CI.
 2. 🚧 **LINE OA webhook** — done: FastAPI `/callback` (`X-Line-Signature` check), follow/unfollow →
    `users`, keyword replies, feedback postbacks → `alerts.feedback`, Flex alert builder, Rich Menu
-   spec ([`docs/line-webhook.md`](docs/line-webhook.md)). Todo: notify job with push quota counter
-   (300/month free tier) and quiet hours.
+   spec ([`docs/line-webhook.md`](docs/line-webhook.md)). Notify job with a push quota counter
+   (300/month free tier, soft cap 280) and quiet hours (push only 06:00–19:00 Asia/Bangkok, see
+   [`docs/jobs.md`](docs/jobs.md)). Todo: scheduler to run it automatically.
 3. 🚧 **LIFF**: ✅ plot registration, ✅ comparison chart (`/liff/chart`), ✅ member consent confirm
    (`/liff/consent`); group page for leaders still open.
 4. ✅ **GPM IMERG + SMAP drought / rain-back alerts** (F2) — `canesat rain-check` + gated

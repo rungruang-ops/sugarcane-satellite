@@ -20,6 +20,7 @@ PostGIS service (`postgis/postgis:16-3.4` with a volume on `/var/lib/postgresql/
 | `CANESAT_INGEST_ON_REGISTER` | `1` (default) = NDVI backfill for newly registered plots |
 | `EARTHDATA_TOKEN` | NASA Earthdata bearer token (GPM IMERG + SMAP) |
 | `ENABLE_PUSH_ALERTS` | **`false` (default)** — do not set `true` without Sam saying yes |
+| `PUSH_WINDOW_START_HOUR`, `PUSH_WINDOW_END_HOUR` | optional quiet hours, Asia/Bangkok hours `[start, end)`; default `6` / `19` ([`docs/jobs.md`](jobs.md)) |
 | `PUBLIC_BASE_URL` | optional HTTPS origin for chart deep links (else Railway domain) |
 
 Never commit secret values; set them as Railway service variables.
